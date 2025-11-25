@@ -24,20 +24,48 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     }
 
     const { phone, message } = validation.data
+    const cleanPhone = phone.replace(/\D/g, "")
 
-    // Em produção, usaria o WhatsApp Engine
-    // const engine = whatsappManager.getEngine(DEFAULT_TENANT_ID);
-    // const result = await engine.sendMessage({ to: phone, content: message });
+    // Try to send via WhatsApp Engine backend
+    const engineUrl = process.env.WHATSAPP_ENGINE_URL || "http://localhost:3001"
+    let sendResult = { success: false, error: "WhatsApp Engine não disponível", messageId: "" }
 
-    // Registra no log (simulação de envio bem-sucedido)
+    try {
+      const resp = await fetch(`${engineUrl.replace(/\/$/, "")}/api/whatsapp/send/${DEFAULT_TENANT_ID}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: cleanPhone, content: message }),
+      })
+
+      const data = await resp.json()
+      if (data.success) {
+        sendResult = { success: true, error: "", messageId: data.data?.messageId || "" }
+      } else {
+        sendResult = { success: false, error: data.error || "Erro ao enviar mensagem", messageId: "" }
+      }
+    } catch (err) {
+      console.error("Error contacting WhatsApp engine:", err)
+      sendResult = { success: false, error: "WhatsApp Engine não disponível. Verifique se o servidor está rodando.", messageId: "" }
+    }
+
+    // Log the message with actual status
     const log = await insert<MessageLog>("message_logs", {
       tenant_id: DEFAULT_TENANT_ID,
-      phone: phone.replace(/\D/g, ""),
+      phone: cleanPhone,
       message_content: message,
-      status: "sent",
-      sent_at: new Date().toISOString(),
-      metadata: JSON.stringify({}),
+      status: sendResult.success ? "sent" : "failed",
+      sent_at: sendResult.success ? new Date().toISOString() : null,
+      error_message: sendResult.success ? null : sendResult.error,
+      metadata: JSON.stringify({ messageId: sendResult.messageId }),
     })
+
+    if (!sendResult.success) {
+      return NextResponse.json({
+        success: false,
+        error: sendResult.error,
+        data: log,
+      }, { status: 400 })
+    }
 
     return NextResponse.json({
       success: true,

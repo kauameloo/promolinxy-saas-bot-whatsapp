@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation"
 import { Header } from "@/components/dashboard/header"
 import { useApi, apiPost, apiPut, apiDelete } from "@/lib/hooks/use-api"
 import { useAuth } from "@/lib/hooks/use-auth"
-import type { MessageFlow, FlowMessage } from "@/lib/types"
+import type { MessageFlow, FlowMessage, CaktoEventType } from "@/lib/types"
 import { EVENT_LABELS } from "@/lib/constants/default-flows"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,7 +35,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Plus, Loader2, Trash2, Clock, GripVertical, Save, Pencil, Copy, Eye } from "lucide-react"
+import { ArrowLeft, Plus, Loader2, Trash2, Clock, GripVertical, Save, Pencil, Copy, Eye, Webhook, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { mutate } from "swr"
 import { cn } from "@/lib/utils"
@@ -203,6 +203,77 @@ function MessageItem({
               </AlertDialog>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function WebhookUrlSection({ eventType }: { eventType: CaktoEventType }) {
+  const [copied, setCopied] = useState(false)
+  
+  // Generate webhook URL for this specific event type
+  const webhookUrl = typeof window !== "undefined" 
+    ? `${window.location.origin}/api/webhooks/cakto/${eventType}`
+    : `/api/webhooks/cakto/${eventType}`
+
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(webhookUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-border bg-card p-6">
+      <h3 className="mb-4 text-lg font-semibold flex items-center gap-2">
+        <Webhook className="h-5 w-5" />
+        Webhook para este Evento
+      </h3>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-muted-foreground">URL do Webhook</Label>
+          <div className="flex gap-2">
+            <Input
+              readOnly
+              value={webhookUrl}
+              className="font-mono text-sm"
+            />
+            <Button variant="outline" onClick={handleCopyUrl}>
+              {copied ? <CheckCircle className="h-4 w-4 text-green-500 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+              {copied ? "Copiado" : "Copiar"}
+            </Button>
+          </div>
+        </div>
+        <div className="rounded-lg bg-blue-500/10 p-4">
+          <p className="text-sm text-blue-600">
+            <strong>Instruções:</strong> Configure esta URL na plataforma Cakto para o evento <strong>{EVENT_LABELS[eventType]}</strong>.
+            Cada tipo de evento tem sua própria URL de webhook.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label className="text-muted-foreground">Exemplo de Payload</Label>
+          <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto">
+{`POST ${webhookUrl}
+Content-Type: application/json
+
+{
+  "customer": {
+    "name": "João Silva",
+    "phone": "5511999999999",
+    "email": "joao@exemplo.com"
+  },
+  "product": {
+    "id": "prod-123",
+    "name": "Curso de Marketing",
+    "price": 497.00
+  },
+  "payment": {
+    "method": "${eventType.includes('pix') ? 'pix' : eventType.includes('boleto') ? 'boleto' : 'credit_card'}",
+    "amount": 497.00,
+    "status": "pending"${eventType.includes('boleto') ? ',\n    "boleto_url": "https://exemplo.com/boleto/123"' : ''}${eventType.includes('pix') ? ',\n    "pix_code": "00020126...",\n    "pix_qrcode": "https://exemplo.com/qr.png"' : ''}
+  }
+}`}
+          </pre>
         </div>
       </div>
     </div>
@@ -386,6 +457,9 @@ Posso te ajudar com alguma dúvida?`,
             )}
           </div>
         </div>
+
+        {/* Webhook URL Section */}
+        <WebhookUrlSection eventType={flow.event_type} />
 
         {/* Messages */}
         <div className="rounded-xl border border-border bg-card p-6">
