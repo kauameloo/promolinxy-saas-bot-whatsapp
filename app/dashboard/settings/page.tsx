@@ -4,15 +4,101 @@
 
 "use client"
 
+import { useState, useEffect } from "react"
 import { Header } from "@/components/dashboard/header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Webhook, Key, Bell } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { useApi, apiPut } from "@/lib/hooks/use-api"
+import { useAuth } from "@/lib/hooks/use-auth"
+import { Webhook, Key, Bell, Loader2, CheckCircle, Copy } from "lucide-react"
+import { mutate } from "swr"
+
+interface Settings {
+  webhook_secret?: { value: string }
+  notifications?: {
+    errors_enabled?: boolean
+    disconnect_enabled?: boolean
+    daily_report_enabled?: boolean
+  }
+}
 
 export default function SettingsPage() {
+  const { data: settings, isLoading } = useApi<Settings>("/api/settings")
+  const { token } = useAuth()
+  const [isSaving, setIsSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [copied, setCopied] = useState(false)
+  
+  const [webhookSecret, setWebhookSecret] = useState("")
+  const [notifications, setNotifications] = useState({
+    errors_enabled: false,
+    disconnect_enabled: false,
+    daily_report_enabled: false,
+  })
+
+  // Carrega valores quando settings carregar
+  useEffect(() => {
+    if (settings) {
+      setWebhookSecret(settings.webhook_secret?.value || "")
+      setNotifications({
+        errors_enabled: settings.notifications?.errors_enabled || false,
+        disconnect_enabled: settings.notifications?.disconnect_enabled || false,
+        daily_report_enabled: settings.notifications?.daily_report_enabled || false,
+      })
+    }
+  }, [settings])
+
+  const handleSaveWebhook = async () => {
+    setIsSaving(true)
+    try {
+      await apiPut("/api/settings", { webhook_secret: webhookSecret }, token)
+      mutate(["/api/settings", token])
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (error) {
+      console.error("Error saving settings:", error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleToggleNotification = async (key: keyof typeof notifications) => {
+    const newNotifications = {
+      ...notifications,
+      [key]: !notifications[key],
+    }
+    setNotifications(newNotifications)
+    
+    try {
+      await apiPut("/api/settings", { notifications: newNotifications }, token)
+      mutate(["/api/settings", token])
+    } catch (error) {
+      console.error("Error saving notification:", error)
+      // Reverte em caso de erro
+      setNotifications(notifications)
+    }
+  }
+
+  const webhookUrl = typeof window !== "undefined" ? `${window.location.origin}/api/webhooks/cakto` : ""
+
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(webhookUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col">
       <Header title="Configurações" description="Configure seu sistema de automação" />
@@ -46,10 +132,13 @@ export default function SettingsPage() {
                   <div className="flex gap-2">
                     <Input
                       readOnly
-                      value={typeof window !== "undefined" ? `${window.location.origin}/api/webhooks/cakto` : ""}
+                      value={webhookUrl}
                       className="font-mono text-sm"
                     />
-                    <Button variant="outline">Copiar</Button>
+                    <Button variant="outline" onClick={handleCopyUrl}>
+                      {copied ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                      {copied ? "Copiado" : "Copiar"}
+                    </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Configure esta URL na plataforma Cakto para receber eventos
@@ -58,11 +147,27 @@ export default function SettingsPage() {
 
                 <div className="space-y-2">
                   <Label>Secret do Webhook (opcional)</Label>
-                  <Input type="password" placeholder="Seu secret para validação de assinatura" />
+                  <Input 
+                    type="password" 
+                    placeholder="Seu secret para validação de assinatura"
+                    value={webhookSecret}
+                    onChange={(e) => setWebhookSecret(e.target.value)}
+                  />
                   <p className="text-sm text-muted-foreground">Use para validar que os webhooks vêm da Cakto</p>
                 </div>
 
-                <Button>Salvar Configurações</Button>
+                <div className="flex items-center gap-4">
+                  <Button onClick={handleSaveWebhook} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Salvar Configurações
+                  </Button>
+                  {saved && (
+                    <span className="flex items-center gap-2 text-sm text-green-500">
+                      <CheckCircle className="h-4 w-4" />
+                      Salvo com sucesso!
+                    </span>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -98,27 +203,30 @@ export default function SettingsPage() {
                     <p className="font-medium">Erros de envio</p>
                     <p className="text-sm text-muted-foreground">Receba notificações quando mensagens falharem</p>
                   </div>
-                  <Button variant="outline" size="sm">
-                    Ativar
-                  </Button>
+                  <Switch 
+                    checked={notifications.errors_enabled}
+                    onCheckedChange={() => handleToggleNotification("errors_enabled")}
+                  />
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
                     <p className="font-medium">WhatsApp desconectado</p>
                     <p className="text-sm text-muted-foreground">Seja notificado quando a conexão cair</p>
                   </div>
-                  <Button variant="outline" size="sm">
-                    Ativar
-                  </Button>
+                  <Switch 
+                    checked={notifications.disconnect_enabled}
+                    onCheckedChange={() => handleToggleNotification("disconnect_enabled")}
+                  />
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
                     <p className="font-medium">Relatório diário</p>
                     <p className="text-sm text-muted-foreground">Receba um resumo diário das atividades</p>
                   </div>
-                  <Button variant="outline" size="sm">
-                    Ativar
-                  </Button>
+                  <Switch 
+                    checked={notifications.daily_report_enabled}
+                    onCheckedChange={() => handleToggleNotification("daily_report_enabled")}
+                  />
                 </div>
               </CardContent>
             </Card>
