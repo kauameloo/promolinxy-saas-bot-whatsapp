@@ -21,6 +21,7 @@ export class WhatsAppEngine {
   private status: WhatsAppSessionInfo["status"] = "disconnected"
   private qrCode: string | null = null
   private phoneNumber: string | null = null
+  private timers: NodeJS.Timeout[] = []
 
   // In production, this would be the whatsapp-web.js Client instance
   // private client: Client | null = null;
@@ -103,22 +104,24 @@ export class WhatsAppEngine {
     // =====================================================
 
     // DEMO MODE: Simulate QR code generation after 1 second
-    setTimeout(() => {
+    const qrTimer = setTimeout(() => {
       if (this.status === "connecting") {
         this.qrCode = `DEMO_QR_${this.sessionId}_${Date.now()}`
         this.status = "qr_ready"
         this.handlers.onQRCode?.(this.qrCode)
       }
     }, 1000)
+    this.timers.push(qrTimer)
 
     // DEMO MODE: Simulate connection after 5 seconds (auto-connect for demo)
-    setTimeout(() => {
+    const connectTimer = setTimeout(() => {
       if (this.status === "qr_ready") {
         this.status = "connected"
         this.phoneNumber = "5511999999999" // Demo phone number
         this.handlers.onReady?.(this.phoneNumber)
       }
     }, 5000)
+    this.timers.push(connectTimer)
   }
 
   /**
@@ -219,6 +222,12 @@ export class WhatsAppEngine {
    * Desconecta a sessão
    */
   async disconnect(): Promise<void> {
+    // Clear all pending timers to prevent memory leaks
+    for (const timer of this.timers) {
+      clearTimeout(timer)
+    }
+    this.timers = []
+
     // PRODUCTION:
     // await this.client?.logout();
     // await this.client?.destroy();

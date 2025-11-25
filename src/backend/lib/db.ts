@@ -5,9 +5,17 @@
 import { Pool, PoolClient, QueryResult } from "pg"
 
 // Create pool with connection string
+// SSL configuration based on environment
+// In production, consider using proper SSL certificates with rejectUnauthorized: true
+const sslConfig = process.env.NODE_ENV === "production" 
+  ? { 
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false"
+    } 
+  : false
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl: sslConfig,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
