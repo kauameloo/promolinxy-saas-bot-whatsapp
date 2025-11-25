@@ -18,27 +18,14 @@ function getSql(): NeonQueryFunction<false, false> {
   return _sql
 }
 
-// Export a proxy that lazily initializes the connection
-const sql = new Proxy({} as NeonQueryFunction<false, false>, {
-  apply(_target, _thisArg, args) {
-    return getSql().apply(null, args as Parameters<NeonQueryFunction<false, false>>)
-  },
-  get(_target, prop) {
-    const sqlInstance = getSql()
-    const value = sqlInstance[prop as keyof typeof sqlInstance]
-    if (typeof value === 'function') {
-      return value.bind(sqlInstance)
-    }
-    return value
-  }
-}) as NeonQueryFunction<false, false>
+// Export the getter function for direct SQL usage (tagged template literals)
+export { getSql as sql }
 
-export { sql }
-
-// Helper para queries tipadas
+// Helper para queries tipadas - uses the query() method for parameterized queries
 export async function query<T>(queryText: string, params?: unknown[]): Promise<T[]> {
   try {
-    const result = await sql(queryText, params)
+    const sqlInstance = getSql()
+    const result = await sqlInstance.query(queryText, params)
     return result as T[]
   } catch (error) {
     console.error("Database query error:", error)
@@ -89,6 +76,7 @@ export async function update<T>(table: string, id: string, data: Record<string, 
 // Helper para delete
 export async function remove(table: string, id: string): Promise<boolean> {
   const queryText = `DELETE FROM ${table} WHERE id = $1`
-  await sql(queryText, [id])
+  const sqlInstance = getSql()
+  await sqlInstance.query(queryText, [id])
   return true
 }
