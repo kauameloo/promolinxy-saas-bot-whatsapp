@@ -9,6 +9,10 @@ import type {
   SendMessageResult,
 } from "./types"
 
+// Import whatsapp-web.js
+import { Client, LocalAuth, MessageMedia } from "whatsapp-web.js"
+import * as qrcode from "qrcode-terminal"
+
 /**
  * WhatsApp Engine abstraction layer
  *
@@ -21,10 +25,7 @@ export class WhatsAppEngine {
   private status: WhatsAppSessionInfo["status"] = "disconnected"
   private qrCode: string | null = null
   private phoneNumber: string | null = null
-  private timers: NodeJS.Timeout[] = []
-
-  // In production, this would be the whatsapp-web.js Client instance
-  // private client: Client | null = null;
+  private client: Client | null = null
 
   constructor(sessionId: string, handlers: WhatsAppEventHandlers = {}) {
     this.sessionId = sessionId
@@ -33,102 +34,91 @@ export class WhatsAppEngine {
 
   /**
    * Inicializa a sessão WhatsApp
-   * Em produção, isso iniciaria o cliente whatsapp-web.js
    */
   async initialize(): Promise<void> {
     console.log(`[WhatsApp Engine] Initializing session: ${this.sessionId}`)
     this.status = "connecting"
 
-    // =====================================================
-    // PRODUCTION IMPLEMENTATION with whatsapp-web.js:
-    // =====================================================
-    // const { Client, LocalAuth } = require('whatsapp-web.js');
-    //
-    // this.client = new Client({
-    //   authStrategy: new LocalAuth({
-    //     clientId: this.sessionId,
-    //     dataPath: process.env.WHATSAPP_SESSION_PATH || './sessions'
-    //   }),
-    //   puppeteer: {
-    //     headless: true,
-    //     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    //     args: [
-    //       '--no-sandbox',
-    //       '--disable-setuid-sandbox',
-    //       '--disable-dev-shm-usage',
-    //       '--disable-accelerated-2d-canvas',
-    //       '--no-first-run',
-    //       '--no-zygote',
-    //       '--single-process',
-    //       '--disable-gpu'
-    //     ]
-    //   }
-    // });
-    //
-    // this.client.on('qr', (qr) => {
-    //   this.qrCode = qr;
-    //   this.status = 'qr_ready';
-    //   this.handlers.onQRCode?.(qr);
-    // });
-    //
-    // this.client.on('ready', () => {
-    //   this.status = 'connected';
-    //   this.phoneNumber = this.client.info.wid.user;
-    //   this.handlers.onReady?.(this.phoneNumber);
-    // });
-    //
-    // this.client.on('authenticated', () => {
-    //   console.log(`[WhatsApp ${this.sessionId}] Authenticated`);
-    // });
-    //
-    // this.client.on('auth_failure', (msg) => {
-    //   console.error(`[WhatsApp ${this.sessionId}] Auth failure:`, msg);
-    //   this.status = 'error';
-    // });
-    //
-    // this.client.on('disconnected', (reason) => {
-    //   this.status = 'disconnected';
-    //   this.handlers.onDisconnected?.(reason);
-    // });
-    //
-    // this.client.on('message', (message) => {
-    //   this.handlers.onMessage?.({
-    //     from: message.from,
-    //     body: message.body,
-    //     timestamp: new Date(message.timestamp * 1000),
-    //     isGroup: message.isGroupMsg,
-    //   });
-    // });
-    //
-    // await this.client.initialize();
-    // =====================================================
+    // Create WhatsApp client with LocalAuth for session persistence
+    this.client = new Client({
+      authStrategy: new LocalAuth({
+        clientId: this.sessionId,
+        dataPath: process.env.WHATSAPP_SESSION_PATH || "./sessions",
+      }),
+      puppeteer: {
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--single-process",
+          "--disable-gpu",
+        ],
+      },
+    })
 
-    // DEMO MODE: Simulate QR code generation after 1 second
-    const qrTimer = setTimeout(() => {
-      if (this.status === "connecting") {
-        this.qrCode = `DEMO_QR_${this.sessionId}_${Date.now()}`
-        this.status = "qr_ready"
-        this.handlers.onQRCode?.(this.qrCode)
-      }
-    }, 1000)
-    this.timers.push(qrTimer)
+    // Handle QR code event
+    this.client.on("qr", (qr: string) => {
+      this.qrCode = qr
+      this.status = "qr_ready"
+      console.log(`[WhatsApp ${this.sessionId}] QR Code received`)
+      // Print QR code to terminal for debugging
+      qrcode.generate(qr, { small: true })
+      this.handlers.onQRCode?.(qr)
+    })
 
-    // DEMO MODE: Simulate connection after 5 seconds (auto-connect for demo)
-    const connectTimer = setTimeout(() => {
-      if (this.status === "qr_ready") {
-        this.status = "connected"
-        this.phoneNumber = "5511999999999" // Demo phone number
+    // Handle ready event
+    this.client.on("ready", () => {
+      this.status = "connected"
+      const info = this.client?.info
+      this.phoneNumber = info?.wid?.user || null
+      console.log(`[WhatsApp ${this.sessionId}] Ready - Phone: ${this.phoneNumber}`)
+      if (this.phoneNumber) {
         this.handlers.onReady?.(this.phoneNumber)
       }
-    }, 5000)
-    this.timers.push(connectTimer)
+    })
+
+    // Handle authenticated event
+    this.client.on("authenticated", () => {
+      console.log(`[WhatsApp ${this.sessionId}] Authenticated`)
+    })
+
+    // Handle auth failure event
+    this.client.on("auth_failure", (msg: string) => {
+      console.error(`[WhatsApp ${this.sessionId}] Auth failure:`, msg)
+      this.status = "error"
+    })
+
+    // Handle disconnected event
+    this.client.on("disconnected", (reason: string) => {
+      this.status = "disconnected"
+      console.log(`[WhatsApp ${this.sessionId}] Disconnected:`, reason)
+      this.handlers.onDisconnected?.(reason)
+    })
+
+    // Handle incoming messages
+    this.client.on("message", (message) => {
+      this.handlers.onMessage?.({
+        from: message.from,
+        body: message.body,
+        timestamp: new Date(message.timestamp * 1000),
+        isGroup: message.from.includes("@g.us"),
+      })
+    })
+
+    // Initialize the client
+    await this.client.initialize()
   }
 
   /**
    * Envia uma mensagem de texto
    */
   async sendMessage(message: WhatsAppMessage): Promise<SendMessageResult> {
-    if (this.status !== "connected") {
+    if (this.status !== "connected" || !this.client) {
       return {
         success: false,
         error: "WhatsApp not connected",
@@ -136,21 +126,19 @@ export class WhatsAppEngine {
     }
 
     try {
-      // PRODUCTION IMPLEMENTATION:
-      // const chatId = message.to.includes('@c.us') ? message.to : `${message.to}@c.us`;
-      // const result = await this.client.sendMessage(chatId, message.content);
-      // return { success: true, messageId: result.id._serialized };
-
+      const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
+      const result = await this.client.sendMessage(chatId, message.content)
+      
       console.log(
-        `[WhatsApp Engine] Sending message to ${message.to}: ${message.content.substring(0, 50)}...`
+        `[WhatsApp Engine] Message sent to ${message.to}: ${message.content.substring(0, 50)}...`
       )
 
-      // DEMO MODE: Simulate successful send
       return {
         success: true,
-        messageId: `msg_${Date.now()}`,
+        messageId: result.id._serialized,
       }
     } catch (error) {
+      console.error(`[WhatsApp Engine] Send message error:`, error)
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -166,7 +154,7 @@ export class WhatsAppEngine {
       return this.sendMessage(message)
     }
 
-    if (this.status !== "connected") {
+    if (this.status !== "connected" || !this.client) {
       return {
         success: false,
         error: "WhatsApp not connected",
@@ -174,21 +162,18 @@ export class WhatsAppEngine {
     }
 
     try {
-      // PRODUCTION IMPLEMENTATION:
-      // const { MessageMedia } = require('whatsapp-web.js');
-      // const media = await MessageMedia.fromUrl(message.mediaUrl);
-      // const chatId = message.to.includes('@c.us') ? message.to : `${message.to}@c.us`;
-      // const result = await this.client.sendMessage(chatId, media, { caption: message.content });
-      // return { success: true, messageId: result.id._serialized };
+      const media = await MessageMedia.fromUrl(message.mediaUrl)
+      const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
+      const result = await this.client.sendMessage(chatId, media, { caption: message.content })
+      
+      console.log(`[WhatsApp Engine] Media sent to ${message.to}`)
 
-      console.log(`[WhatsApp Engine] Sending media to ${message.to}`)
-
-      // DEMO MODE
       return {
         success: true,
-        messageId: `msg_media_${Date.now()}`,
+        messageId: result.id._serialized,
       }
     } catch (error) {
+      console.error(`[WhatsApp Engine] Send media error:`, error)
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -212,9 +197,11 @@ export class WhatsAppEngine {
    * Gera novo QR Code
    */
   async refreshQRCode(): Promise<string | null> {
-    // PRODUCTION: Would reinitialize the client to get new QR
-    this.status = "qr_ready"
-    this.qrCode = `DEMO_QR_${this.sessionId}_${Date.now()}`
+    // Reinitialize to get new QR code
+    if (this.client) {
+      await this.disconnect()
+      await this.initialize()
+    }
     return this.qrCode
   }
 
@@ -222,15 +209,19 @@ export class WhatsAppEngine {
    * Desconecta a sessão
    */
   async disconnect(): Promise<void> {
-    // Clear all pending timers to prevent memory leaks
-    for (const timer of this.timers) {
-      clearTimeout(timer)
+    if (this.client) {
+      try {
+        await this.client.logout()
+      } catch (error) {
+        console.error(`[WhatsApp Engine] Logout error:`, error)
+      }
+      try {
+        await this.client.destroy()
+      } catch (error) {
+        console.error(`[WhatsApp Engine] Destroy error:`, error)
+      }
+      this.client = null
     }
-    this.timers = []
-
-    // PRODUCTION:
-    // await this.client?.logout();
-    // await this.client?.destroy();
 
     this.status = "disconnected"
     this.qrCode = null
