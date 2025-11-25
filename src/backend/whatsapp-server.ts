@@ -6,10 +6,10 @@ import { WhatsAppEngine, whatsappManager } from "./lib/whatsapp-engine"
 import { MessageQueue } from "./lib/message-queue"
 import { query, queryOne, update, dbPool, closePool } from "./lib/db"
 import type { WhatsAppSession, Tenant } from "./lib/types"
-import express, { Request, Response, NextFunction } from "express"
+import express, { Application, Request, Response, NextFunction } from "express"
 import cors from "cors"
 
-const app = express()
+const app: Application = express()
 const PORT = process.env.WHATSAPP_PORT || 3001
 
 // Middleware
