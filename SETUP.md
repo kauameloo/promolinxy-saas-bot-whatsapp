@@ -1,19 +1,140 @@
-# 🚀 Guia Completo de Configuração e Deploy - SaaS Bot WhatsApp
+# 🚀 Guia Completo de Configuração - SaaS Bot WhatsApp
 
-Este documento contém **todas as instruções detalhadas** para configurar, rodar e fazer deploy do projeto SaaS Bot WhatsApp com integração Cakto.
+Este documento contém **todas as instruções detalhadas** para configurar e rodar o projeto SaaS Bot WhatsApp com integração Cakto na sua máquina local.
 
 ---
 
-## 📋 Índice
+## ⚡ INÍCIO RÁPIDO - Rodando Localmente em 5 Minutos
+
+> **Siga esses passos para ter o projeto funcionando na sua máquina!**
+
+### 1️⃣ Pré-requisitos Obrigatórios
+
+Antes de começar, certifique-se de ter instalado:
+
+- **Node.js 18+** → [Baixar aqui](https://nodejs.org/)
+- **PostgreSQL 15+** → [Baixar aqui](https://www.postgresql.org/download/) OU use [Neon](https://neon.tech) (gratuito online)
+
+Para verificar se está instalado:
+```bash
+node --version    # Deve mostrar v18.x.x ou superior
+npm --version     # Deve mostrar 9.x.x ou superior
+```
+
+### 2️⃣ Clonar o Projeto
+
+```bash
+git clone https://github.com/kauameloo/promolinxy-saas-bot-whatsapp.git
+cd promolinxy-saas-bot-whatsapp
+```
+
+### 3️⃣ Instalar Dependências
+
+```bash
+npm install
+```
+
+### 4️⃣ Configurar o Banco de Dados
+
+**Opção A - Usando Neon (mais fácil, online e gratuito):**
+
+1. Acesse [neon.tech](https://neon.tech) e crie uma conta gratuita
+2. Clique em "Create Project" e dê um nome (ex: `saasbot`)
+3. Copie a "Connection String" que aparece
+4. Crie o arquivo `.env` na raiz do projeto:
+
+```bash
+cp .env.example .env
+```
+
+5. Abra o `.env` e cole a connection string:
+
+```bash
+DATABASE_URL=postgresql://seu-usuario:sua-senha@ep-xxx.neon.tech/neondb?sslmode=require
+JWT_SECRET=minha-chave-secreta-super-segura-com-mais-de-64-caracteres-aqui-ok
+```
+
+6. No Neon, vá em "SQL Editor" e cole todo o conteúdo do arquivo `scripts/001-create-database-schema.sql`, depois clique em "Run"
+
+**Opção B - Usando PostgreSQL Local:**
+
+```bash
+# 1. Criar banco e usuário (no terminal do PostgreSQL)
+sudo -u postgres psql
+CREATE USER saasbot WITH PASSWORD 'saasbot123';
+CREATE DATABASE saasbot OWNER saasbot;
+GRANT ALL PRIVILEGES ON DATABASE saasbot TO saasbot;
+\q
+
+# 2. Executar schema
+psql -U saasbot -d saasbot -f scripts/001-create-database-schema.sql
+
+# 3. Criar arquivo .env
+cp .env.example .env
+```
+
+No arquivo `.env`, configure:
+```bash
+DATABASE_URL=postgresql://saasbot:saasbot123@localhost:5432/saasbot
+JWT_SECRET=minha-chave-secreta-super-segura-com-mais-de-64-caracteres-aqui-ok
+```
+
+### 5️⃣ Rodar o Projeto
+
+```bash
+npm run dev
+```
+
+### 6️⃣ Acessar o Dashboard
+
+1. Abra o navegador: **http://localhost:3000**
+2. Faça login com:
+   - 📧 **Email:** `admin@saasbot.com`
+   - 🔑 **Senha:** `admin123`
+
+### ✅ Pronto! O projeto está rodando!
+
+Agora você pode:
+- Ver o Dashboard com estatísticas
+- Criar fluxos de mensagens
+- Visualizar clientes e pedidos
+- Ver logs de mensagens
+
+---
+
+## 🛠️ Comandos Úteis para Desenvolvimento Local
+
+```bash
+# Iniciar servidor de desenvolvimento
+npm run dev
+
+# Build de produção
+npm run build
+
+# Iniciar em modo produção (após build)
+npm run start
+
+# Verificar erros de lint
+npm run lint
+
+# Limpar cache do Next.js (se tiver problemas)
+rm -rf .next
+```
+
+---
+
+## 📋 Índice (Documentação Avançada)
+
+> As seções abaixo são para configurações avançadas e deploy em produção.
 
 1. [Visão Geral do Projeto](#-visão-geral-do-projeto)
-2. [Pré-requisitos](#-pré-requisitos)
+2. [Pré-requisitos (Detalhado)](#-pré-requisitos)
 3. [Estrutura do Projeto](#-estrutura-do-projeto)
 4. [Configuração do Ambiente](#-configuração-do-ambiente)
-5. [Instalação Local (Desenvolvimento)](#-instalação-local-desenvolvimento)
-6. [Configuração do Banco de Dados](#-configuração-do-banco-de-dados)
-7. [Deploy com Docker](#-deploy-com-docker)
-8. [Deploy na Vercel (Frontend)](#-deploy-na-vercel-frontend)
+5. [Instalação Local (Detalhada)](#-instalação-local-desenvolvimento)
+6. [Configuração do Banco de Dados (Detalhada)](#-configuração-do-banco-de-dados)
+7. [Deploy com Docker (Produção)](#-deploy-com-docker)
+8. [Deploy na Vercel (Produção)](#-deploy-na-vercel-frontend)
 9. [Configuração do WhatsApp Engine](#-configuração-do-whatsapp-engine)
 10. [Configuração dos Webhooks Cakto](#-configuração-dos-webhooks-cakto)
 11. [Endpoints da API](#-endpoints-da-api)
