@@ -5,6 +5,7 @@
 "use client"
 
 import { useState } from "react"
+import { QRCodeSVG } from "qrcode.react"
 import { Header } from "@/components/dashboard/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,8 +15,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { useApi, apiPost } from "@/lib/hooks/use-api"
 import type { WhatsAppSession } from "@/lib/types"
 import { Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Loader2, Send, CheckCircle } from "lucide-react"
-import { mutate } from "swr"
+import { useSWRConfig } from "swr"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 const statusConfig = {
   disconnected: { label: "Desconectado", icon: WifiOff, color: "text-muted-foreground", bg: "bg-muted" },
@@ -27,6 +29,8 @@ const statusConfig = {
 
 export default function WhatsAppPage() {
   const { data: session, isLoading } = useApi<WhatsAppSession>("/api/whatsapp/status")
+  const { token } = useAuth()
+  const { mutate } = useSWRConfig()
   const [isConnecting, setIsConnecting] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [phone, setPhone] = useState("")
@@ -41,7 +45,8 @@ export default function WhatsAppPage() {
     setIsConnecting(true)
     try {
       await apiPost("/api/whatsapp/status", {})
-      mutate("/api/whatsapp/status")
+      // Revalidate using the correct cache key [url, token]
+      await mutate(["/api/whatsapp/status", token])
     } catch (error) {
       console.error("Error connecting:", error)
     } finally {
@@ -120,8 +125,12 @@ export default function WhatsAppPage() {
                 {session?.qr_code && status === "qr_ready" ? (
                   <div className="text-center p-4">
                     <div className="bg-white p-4 rounded-lg">
-                      {/* In production, this would render a real QR code */}
-                      <QrCode className="mx-auto h-32 w-32 text-gray-800" />
+                      <QRCodeSVG 
+                        value={session.qr_code} 
+                        size={200}
+                        level="M"
+                        includeMargin={true}
+                      />
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">Escaneie com seu WhatsApp</p>
                   </div>
