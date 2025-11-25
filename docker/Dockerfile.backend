@@ -38,12 +38,13 @@ COPY package*.json pnpm-lock.yaml* yarn.lock* ./
 
 # Instala dependências - suporta npm, yarn e pnpm
 RUN \
+  # Install full deps (dev + prod) because we need build-time tools (postcss, tailwind, etc.)
   if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm install --frozen-lockfile --prod; \
+    corepack enable pnpm && pnpm install --frozen-lockfile; \
   elif [ -f yarn.lock ]; then \
-    yarn --frozen-lockfile --production; \
+    yarn --frozen-lockfile; \
   else \
-    npm ci --only=production; \
+    npm ci; \
   fi
 
 # Copia código fonte
@@ -57,6 +58,16 @@ RUN \
     yarn build; \
   else \
     npm run build; \
+  fi
+
+# Remove dev dependencies after build to keep image lean
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    pnpm prune --prod || true; \
+  elif [ -f yarn.lock ]; then \
+    yarn install --production --frozen-lockfile || true; \
+  else \
+    npm prune --production || true; \
   fi
 
 # Expõe porta

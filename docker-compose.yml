@@ -2,8 +2,6 @@
 # DOCKER COMPOSE - Stack completa
 # =====================================================
 
-version: '3.8'
-
 services:
   # ==========================================
   # Frontend - Next.js Dashboard
