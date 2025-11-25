@@ -73,6 +73,8 @@ export async function POST(
     }
 
     // Verifica assinatura (se configurada)
+    // Supports both "x-cakto-signature" (Cakto-specific) and generic "x-webhook-signature" headers
+    // to provide flexibility for different webhook sources and configurations
     const signature = request.headers.get("x-cakto-signature") || request.headers.get("x-webhook-signature")
     const webhookSecret = process.env.CAKTO_WEBHOOK_SECRET
 

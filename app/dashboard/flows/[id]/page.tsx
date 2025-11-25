@@ -223,6 +223,35 @@ function WebhookUrlSection({ eventType }: { eventType: CaktoEventType }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Helper function to generate payment method and extra fields based on event type
+  const getPaymentExample = () => {
+    if (eventType.includes('pix')) {
+      return {
+        method: 'pix',
+        extraFields: '"pix_code": "00020126...",\n    "pix_qrcode": "https://exemplo.com/qr.png"'
+      }
+    }
+    if (eventType.includes('boleto')) {
+      return {
+        method: 'boleto',
+        extraFields: '"boleto_url": "https://exemplo.com/boleto/123"'
+      }
+    }
+    if (eventType.includes('picpay')) {
+      return {
+        method: 'picpay',
+        extraFields: '"checkout_url": "https://picpay.me/exemplo"'
+      }
+    }
+    return {
+      method: 'credit_card',
+      extraFields: ''
+    }
+  }
+
+  const payment = getPaymentExample()
+  const paymentFieldsJson = payment.extraFields ? `,\n    ${payment.extraFields}` : ''
+
   return (
     <div className="mb-6 rounded-xl border border-border bg-card p-6">
       <h3 className="mb-4 text-lg font-semibold flex items-center gap-2">
@@ -268,9 +297,9 @@ Content-Type: application/json
     "price": 497.00
   },
   "payment": {
-    "method": "${eventType.includes('pix') ? 'pix' : eventType.includes('boleto') ? 'boleto' : 'credit_card'}",
+    "method": "${payment.method}",
     "amount": 497.00,
-    "status": "pending"${eventType.includes('boleto') ? ',\n    "boleto_url": "https://exemplo.com/boleto/123"' : ''}${eventType.includes('pix') ? ',\n    "pix_code": "00020126...",\n    "pix_qrcode": "https://exemplo.com/qr.png"' : ''}
+    "status": "pending"${paymentFieldsJson}
   }
 }`}
           </pre>

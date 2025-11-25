@@ -14,6 +14,9 @@ const SendMessageSchema = z.object({
   message: z.string().min(1, "Mensagem é obrigatória"),
 })
 
+// Timeout for WhatsApp Engine requests (10 seconds)
+const ENGINE_REQUEST_TIMEOUT_MS = 10000
+
 export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<MessageLog>>> {
   try {
     const body = await request.json()
@@ -31,21 +34,47 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     let sendResult = { success: false, error: "WhatsApp Engine não disponível", messageId: "" }
 
     try {
+      // Create AbortController for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), ENGINE_REQUEST_TIMEOUT_MS)
+
       const resp = await fetch(`${engineUrl.replace(/\/$/, "")}/api/whatsapp/send/${DEFAULT_TENANT_ID}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to: cleanPhone, content: message }),
+        signal: controller.signal,
       })
 
-      const data = await resp.json()
-      if (data.success) {
-        sendResult = { success: true, error: "", messageId: data.data?.messageId || "" }
+      clearTimeout(timeoutId)
+
+      // Handle different HTTP status codes
+      if (resp.status === 404) {
+        sendResult = { success: false, error: "WhatsApp não está conectado. Conecte primeiro na página de WhatsApp.", messageId: "" }
+      } else if (resp.status >= 500) {
+        sendResult = { success: false, error: "Erro interno no servidor WhatsApp. Tente novamente.", messageId: "" }
       } else {
-        sendResult = { success: false, error: data.error || "Erro ao enviar mensagem", messageId: "" }
+        const data = await resp.json()
+        if (data.success) {
+          sendResult = { success: true, error: "", messageId: data.data?.messageId || "" }
+        } else {
+          sendResult = { success: false, error: data.error || "Erro ao enviar mensagem", messageId: "" }
+        }
       }
     } catch (err) {
       console.error("Error contacting WhatsApp engine:", err)
-      sendResult = { success: false, error: "WhatsApp Engine não disponível. Verifique se o servidor está rodando.", messageId: "" }
+      
+      // Handle specific error types
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          sendResult = { success: false, error: "Tempo limite excedido ao conectar com o servidor WhatsApp.", messageId: "" }
+        } else if (err.message.includes('ECONNREFUSED')) {
+          sendResult = { success: false, error: "WhatsApp Engine não está rodando. Verifique se o servidor backend está ativo.", messageId: "" }
+        } else {
+          sendResult = { success: false, error: "Erro de conexão com o WhatsApp Engine. Verifique se o servidor está rodando.", messageId: "" }
+        }
+      } else {
+        sendResult = { success: false, error: "WhatsApp Engine não disponível. Verifique se o servidor está rodando.", messageId: "" }
+      }
     }
 
     // Log the message with actual status

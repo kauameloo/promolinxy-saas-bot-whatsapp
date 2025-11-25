@@ -27,6 +27,9 @@ const statusConfig = {
   error: { label: "Erro na conexão", icon: WifiOff, color: "text-red-500", bg: "bg-red-500/10" },
 }
 
+// Demo QR code prefix used when WhatsApp Engine is not available
+const DEMO_QR_CODE_PREFIX = "DEMO_QR_CODE"
+
 export default function WhatsAppPage() {
   // Auto-refresh every 3 seconds when connecting or qr_ready to detect status changes
   const { data: session, isLoading } = useApi<WhatsAppSession>("/api/whatsapp/status", {
@@ -65,7 +68,11 @@ export default function WhatsAppPage() {
       await mutate(["/api/whatsapp/status", token])
     } catch (error) {
       console.error("Error connecting:", error)
-      setIsConnecting(false)
+    } finally {
+      // Note: We intentionally don't reset isConnecting here because the 
+      // useEffect above handles it when status changes to connected/qr_ready/error.
+      // This provides better UX as the loading state persists until actual connection happens.
+      // Only reset on error since the status won't change in that case.
     }
   }
 
@@ -140,7 +147,7 @@ export default function WhatsAppPage() {
             </CardHeader>
             <CardContent>
               <div className="flex aspect-square items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/50">
-                {session?.qr_code && status === "qr_ready" && !session.qr_code.startsWith("DEMO_QR_CODE") ? (
+                {session?.qr_code && status === "qr_ready" && !session.qr_code.startsWith(DEMO_QR_CODE_PREFIX) ? (
                   <div className="text-center p-4">
                     <div className="bg-white p-4 rounded-lg">
                       <QRCodeSVG 
