@@ -119,7 +119,7 @@ export interface WhatsAppSessionInfo {
 
 export interface WhatsAppEventHandlers {
   onQRCode?: (qr: string) => void
-  onReady?: (phoneNumber: string | null) => void
+  onReady?: (phoneNumber: string) => void
   onDisconnected?: (reason: string) => void
   onMessage?: (message: IncomingMessage) => void
   onMessageStatus?: (status: MessageStatusUpdate) => void
