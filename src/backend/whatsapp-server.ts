@@ -240,6 +240,21 @@ app.get("/api/whatsapp/sessions", (_req: Request, res: Response) => {
   return res.json({ success: true, data: sessions })
 })
 
+// Debug: return engine status for a tenant
+app.get("/api/whatsapp/debug/:tenantId", (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params
+    const engine = whatsappManager.getEngine(tenantId)
+    if (!engine) {
+      return res.status(404).json({ success: false, error: "Engine not found" })
+    }
+    return res.json({ success: true, data: engine.getStatus() })
+  } catch (error) {
+    console.error("Debug route error:", error)
+    return res.status(500).json({ success: false, error: "Error retrieving debug status" })
+  }
+})
+
 // =====================================================
 // MESSAGE QUEUE MANAGEMENT
 // =====================================================

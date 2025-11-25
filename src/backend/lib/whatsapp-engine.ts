@@ -40,10 +40,14 @@ export class WhatsAppEngine {
     this.status = "connecting"
 
     // Create WhatsApp client with LocalAuth for session persistence
+    const dataPath = process.env.WHATSAPP_SESSION_PATH || "./sessions"
+    // Prefer an explicit client id (to mimic your working example), fallback to sessionId
+    const clientId = process.env.WHATSAPP_CLIENT_ID || "bot-session"
+    console.log(`[WhatsApp Engine] Using LocalAuth dataPath: ${dataPath}, clientId: ${clientId}`)
     this.client = new Client({
       authStrategy: new LocalAuth({
-        clientId: this.sessionId,
-        dataPath: process.env.WHATSAPP_SESSION_PATH || "./sessions",
+        clientId,
+        dataPath,
       }),
       puppeteer: {
         headless: true,
@@ -65,7 +69,13 @@ export class WhatsAppEngine {
     this.client.on("qr", (qr: string) => {
       this.qrCode = qr
       this.status = "qr_ready"
-      console.log(`[WhatsApp ${this.sessionId}] QR Code received`)
+      console.log(`[WhatsApp ${this.sessionId}] QR Code received (length=${qr?.length})`)
+      // Log a short prefix of the QR payload for debugging (avoid logging full potentially large string)
+      try {
+        console.log(`[WhatsApp ${this.sessionId}] QR preview: ${qr?.substring(0, 120)}`)
+      } catch (e) {
+        // ignore
+      }
       // Print QR code to terminal for debugging
       qrcode.generate(qr, { small: true })
       this.handlers.onQRCode?.(qr)
@@ -101,7 +111,7 @@ export class WhatsAppEngine {
     })
 
     // Handle incoming messages
-    this.client.on("message", (message) => {
+    this.client.on("message", (message: any) => {
       // Guard against null/undefined message properties
       if (!message?.from || !message?.body) {
         console.warn(`[WhatsApp ${this.sessionId}] Received message with missing properties`)

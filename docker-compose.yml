@@ -19,6 +19,8 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - CAKTO_WEBHOOK_SECRET=${CAKTO_WEBHOOK_SECRET}
+      # Tell the frontend how to reach the WhatsApp engine service inside compose
+      - WHATSAPP_ENGINE_URL=http://whatsapp-engine:3001
     depends_on:
       - postgres
     networks:
@@ -39,6 +41,8 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
+      # Use a predictable client id to match the working snippet (bot-session) by default
+      - WHATSAPP_CLIENT_ID=bot-session
       - WHATSAPP_SESSION_PATH=/app/sessions
       - WHATSAPP_PORT=3001
       - QUEUE_STATS_PORT=3002

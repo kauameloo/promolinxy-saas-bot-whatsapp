@@ -40,7 +40,31 @@ export async function GET(): Promise<NextResponse<ApiResponse<WhatsAppSession>>>
 
 export async function POST(): Promise<NextResponse<ApiResponse>> {
   try {
-    // Simula conexão - Em produção, iniciaria o whatsapp-web.js
+  // In production, trigger the external WhatsApp Engine service if configured.
+  // Try env var first, then default to localhost where the engine typically listens in dev.
+  const engineUrl = process.env.WHATSAPP_ENGINE_URL || "http://localhost:3001"
+
+    if (engineUrl) {
+      try {
+        const resp = await fetch(`${engineUrl.replace(/\/$/, "")}/api/whatsapp/connect/${DEFAULT_TENANT_ID}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        if (!resp.ok) {
+          // If backend failed, log and fall back to demo behavior
+          console.error("WhatsApp engine responded with error status", resp.status)
+        } else {
+          const body = await resp.json()
+          return NextResponse.json({ success: true, message: body.message || "Conexão iniciada." })
+        }
+      } catch (err) {
+        console.error("Error contacting WhatsApp engine:", err)
+        // fallthrough to demo behavior
+      }
+    }
+
+    // Fallback/demo behavior when engine URL is not set or call failed.
     const session = await queryOne<WhatsAppSession>(`SELECT * FROM whatsapp_sessions WHERE tenant_id = $1 LIMIT 1`, [
       DEFAULT_TENANT_ID,
     ])
