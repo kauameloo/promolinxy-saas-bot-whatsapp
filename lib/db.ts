@@ -2,10 +2,36 @@
 // DATABASE - Conexão com Neon PostgreSQL
 // =====================================================
 
-import { neon } from "@neondatabase/serverless"
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless"
 
-// Singleton para conexão do banco
-const sql = neon(process.env.DATABASE_URL!)
+// Singleton para conexão do banco (lazy initialization)
+let _sql: NeonQueryFunction<false, false> | null = null
+
+function getSql(): NeonQueryFunction<false, false> {
+  if (!_sql) {
+    const connectionString = process.env.DATABASE_URL
+    if (!connectionString) {
+      throw new Error("DATABASE_URL environment variable is not set")
+    }
+    _sql = neon(connectionString)
+  }
+  return _sql
+}
+
+// Export a proxy that lazily initializes the connection
+const sql = new Proxy({} as NeonQueryFunction<false, false>, {
+  apply(_target, _thisArg, args) {
+    return getSql().apply(null, args as Parameters<NeonQueryFunction<false, false>>)
+  },
+  get(_target, prop) {
+    const sqlInstance = getSql()
+    const value = sqlInstance[prop as keyof typeof sqlInstance]
+    if (typeof value === 'function') {
+      return value.bind(sqlInstance)
+    }
+    return value
+  }
+}) as NeonQueryFunction<false, false>
 
 export { sql }
 

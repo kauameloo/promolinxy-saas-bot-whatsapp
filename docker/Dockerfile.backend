@@ -34,16 +34,30 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 WORKDIR /app
 
 # Copia arquivos de dependência
-COPY package*.json ./
+COPY package*.json pnpm-lock.yaml* yarn.lock* ./
 
-# Instala dependências
-RUN npm ci --only=production
+# Instala dependências - suporta npm, yarn e pnpm
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm install --frozen-lockfile --prod; \
+  elif [ -f yarn.lock ]; then \
+    yarn --frozen-lockfile --production; \
+  else \
+    npm ci --only=production; \
+  fi
 
 # Copia código fonte
 COPY . .
 
 # Build da aplicação
-RUN npm run build
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm run build; \
+  elif [ -f yarn.lock ]; then \
+    yarn build; \
+  else \
+    npm run build; \
+  fi
 
 # Expõe porta
 EXPOSE 3001
