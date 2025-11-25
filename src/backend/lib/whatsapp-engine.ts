@@ -17,6 +17,12 @@ import * as path from "path"
 import * as crypto from "crypto"
 
 /**
+ * Directory name used by whatsapp-web.js LocalAuth strategy
+ * This is a library convention and should be kept in sync with whatsapp-web.js
+ */
+const WWEBJS_AUTH_DIR = ".wwebjs_auth"
+
+/**
  * Session persistence configuration
  * Implements best practices from leading SaaS platforms (Z-API, Take Blip, etc.)
  */
@@ -42,6 +48,73 @@ const DEFAULT_PERSISTENCE_CONFIG: SessionPersistenceConfig = {
   autoReconnect: true,
   maxReconnectAttempts: 5,
   reconnectDelay: 5000,
+}
+
+// =====================================================
+// SESSION UTILITY FUNCTIONS
+// =====================================================
+
+/**
+ * Gets the session-specific directory path
+ */
+function getSessionDir(dataPath: string, sessionId: string): string {
+  return path.join(dataPath, `session-${sessionId}`)
+}
+
+/**
+ * Gets the path to the session metadata file
+ */
+function getMetadataPath(dataPath: string, sessionId: string): string {
+  return path.join(getSessionDir(dataPath, sessionId), "session-metadata.json")
+}
+
+/**
+ * Gets the LocalAuth directory path for a session
+ */
+function getAuthDir(dataPath: string, sessionId: string): string {
+  return path.join(dataPath, WWEBJS_AUTH_DIR, `session-${sessionId}`)
+}
+
+/**
+ * Checks if a valid session exists for restoration (static check)
+ */
+function checkSessionExists(dataPath: string, sessionId: string): boolean {
+  const authDir = getAuthDir(dataPath, sessionId)
+  const metadataPath = getMetadataPath(dataPath, sessionId)
+  
+  // Check if LocalAuth session directory exists
+  const localAuthExists = fs.existsSync(authDir)
+  const metadataExists = fs.existsSync(metadataPath)
+  
+  return localAuthExists || metadataExists
+}
+
+/**
+ * Loads session metadata from file (static utility)
+ */
+function loadMetadataFromFile(
+  dataPath: string, 
+  sessionId: string, 
+  encryptionKey?: string
+): { phoneNumber?: string; lastConnected?: string } | null {
+  try {
+    const metadataPath = getMetadataPath(dataPath, sessionId)
+    if (!fs.existsSync(metadataPath)) return null
+    
+    const encryptedData = fs.readFileSync(metadataPath, "utf8")
+    
+    // Decrypt if encryption key is provided
+    let data = encryptedData
+    if (encryptionKey) {
+      const encryption = new SessionEncryption(encryptionKey)
+      data = encryption.decrypt(encryptedData)
+    }
+    
+    return JSON.parse(data)
+  } catch (error) {
+    console.error(`[WhatsApp Engine] Error loading session metadata for ${sessionId}:`, error)
+    return null
+  }
 }
 
 /**
@@ -131,25 +204,11 @@ export class WhatsAppEngine {
    * Ensures the session directory exists
    */
   private ensureSessionDirectory(): void {
-    const sessionDir = this.getSessionDir()
+    const sessionDir = getSessionDir(this.persistenceConfig.dataPath, this.sessionId)
     if (!fs.existsSync(sessionDir)) {
       fs.mkdirSync(sessionDir, { recursive: true })
       console.log(`[WhatsApp Engine] Created session directory: ${sessionDir}`)
     }
-  }
-
-  /**
-   * Gets the session-specific directory path
-   */
-  private getSessionDir(): string {
-    return path.join(this.persistenceConfig.dataPath, `session-${this.sessionId}`)
-  }
-
-  /**
-   * Gets the path to the session metadata file
-   */
-  private getMetadataPath(): string {
-    return path.join(this.getSessionDir(), "session-metadata.json")
   }
 
   /**
@@ -173,7 +232,9 @@ export class WhatsAppEngine {
         ? this.encryption.encrypt(data) 
         : data
       
-      fs.writeFileSync(this.getMetadataPath(), encryptedData, "utf8")
+      const metadataPath = getMetadataPath(this.persistenceConfig.dataPath, this.sessionId)
+      fs.writeFileSync(metadataPath, encryptedData, "utf8")
+      console.log(`[WhatsApp Engine] Session metadata saved for ${this.sessionId}`)
       console.log(`[WhatsApp Engine] Session metadata saved for ${this.sessionId}`)
     } catch (error) {
       console.error(`[WhatsApp Engine] Error saving session metadata:`, error)
@@ -184,34 +245,18 @@ export class WhatsAppEngine {
    * Loads session metadata for recovery
    */
   loadSessionMetadata(): { phoneNumber?: string; lastConnected?: string } | null {
-    try {
-      const metadataPath = this.getMetadataPath()
-      if (!fs.existsSync(metadataPath)) return null
-      
-      const encryptedData = fs.readFileSync(metadataPath, "utf8")
-      const data = this.persistenceConfig.encryptionKey 
-        ? this.encryption.decrypt(encryptedData) 
-        : encryptedData
-      
-      return JSON.parse(data)
-    } catch (error) {
-      console.error(`[WhatsApp Engine] Error loading session metadata:`, error)
-      return null
-    }
+    return loadMetadataFromFile(
+      this.persistenceConfig.dataPath,
+      this.sessionId,
+      this.persistenceConfig.encryptionKey
+    )
   }
 
   /**
    * Checks if a valid session exists for restoration
    */
   hasExistingSession(): boolean {
-    const sessionDir = this.getSessionDir()
-    const authDir = path.join(this.persistenceConfig.dataPath, `.wwebjs_auth`, `session-${this.sessionId}`)
-    
-    // Check if LocalAuth session directory exists
-    const localAuthExists = fs.existsSync(authDir)
-    const metadataExists = fs.existsSync(this.getMetadataPath())
-    
-    return localAuthExists || metadataExists
+    return checkSessionExists(this.persistenceConfig.dataPath, this.sessionId)
   }
 
   /**
@@ -621,18 +666,18 @@ class WhatsAppManager {
 
   /**
    * Checks if a session has existing data that can be restored
+   * Uses static utility function for efficiency (no engine instantiation needed)
    */
   hasExistingSession(sessionId: string): boolean {
-    const engine = new WhatsAppEngine(sessionId, {}, this.config)
-    return engine.hasExistingSession()
+    return checkSessionExists(this.config.dataPath, sessionId)
   }
 
   /**
    * Gets metadata for an existing session without initializing it
+   * Uses static utility function for efficiency (no engine instantiation needed)
    */
   getSessionMetadata(sessionId: string): { phoneNumber?: string; lastConnected?: string } | null {
-    const engine = new WhatsAppEngine(sessionId, {}, this.config)
-    return engine.loadSessionMetadata()
+    return loadMetadataFromFile(this.config.dataPath, sessionId, this.config.encryptionKey)
   }
 
   /**
@@ -659,8 +704,8 @@ class WhatsAppManager {
    */
   async deleteSessionData(sessionId: string): Promise<boolean> {
     try {
-      const sessionDir = path.join(this.config.dataPath, `session-${sessionId}`)
-      const authDir = path.join(this.config.dataPath, `.wwebjs_auth`, `session-${sessionId}`)
+      const sessionDir = getSessionDir(this.config.dataPath, sessionId)
+      const authDir = getAuthDir(this.config.dataPath, sessionId)
       
       // Remove session directory
       if (fs.existsSync(sessionDir)) {

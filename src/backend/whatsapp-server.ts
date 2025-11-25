@@ -267,10 +267,11 @@ app.delete("/api/whatsapp/session-data/:tenantId", async (req: Request, res: Res
   try {
     const { tenantId } = req.params
     
-    // First disconnect if active
+    // First disconnect if active (false = don't preserve session, do full logout)
     const engine = whatsappManager.getEngine(tenantId)
     if (engine) {
-      await whatsappManager.removeEngine(tenantId, false)
+      const preserveSessionOnDelete = false
+      await whatsappManager.removeEngine(tenantId, preserveSessionOnDelete)
     }
     
     // Delete persisted data
