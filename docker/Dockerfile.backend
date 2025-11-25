@@ -38,7 +38,7 @@ COPY package*.json pnpm-lock.yaml* yarn.lock* ./
 
 # Instala dependências - suporta npm, yarn e pnpm
 RUN \
-  # Install full deps (dev + prod) because we need build-time tools (postcss, tailwind, etc.)
+  # Install full deps (dev + prod) because we need build-time tools (typescript, etc.)
   if [ -f pnpm-lock.yaml ]; then \
     corepack enable pnpm && pnpm install --frozen-lockfile; \
   elif [ -f yarn.lock ]; then \
@@ -50,15 +50,18 @@ RUN \
 # Copia código fonte
 COPY . .
 
-# Build da aplicação
+# Build do backend (TypeScript -> JavaScript)
 RUN \
   if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm run build; \
+    corepack enable pnpm && pnpm run build:backend; \
   elif [ -f yarn.lock ]; then \
-    yarn build; \
+    yarn build:backend; \
   else \
-    npm run build; \
+    npm run build:backend; \
   fi
+
+# Cria diretório de logs
+RUN mkdir -p /app/logs /app/sessions
 
 # Remove dev dependencies after build to keep image lean
 RUN \
@@ -70,8 +73,8 @@ RUN \
     npm prune --production || true; \
   fi
 
-# Expõe porta
-EXPOSE 3001
+# Expõe portas (WhatsApp server + Queue stats)
+EXPOSE 3001 3002
 
 # Comando de inicialização com PM2
 CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
