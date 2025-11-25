@@ -28,3 +28,35 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Local development (Docker)
+
+Quick start using Docker Compose (recommended to reproduce production-like environment):
+
+1. Copy the example env file and review values:
+
+```bash
+cp .env.example .env
+# Edit .env as needed (especially JWT_SECRET and CAKTO_WEBHOOK_SECRET)
+```
+
+2. Start services with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+This will bring up the frontend (Next.js), the WhatsApp engine service, PostgreSQL and Redis as defined in `docker-compose.yml`.
+
+3. Open the dashboard at: http://localhost:3000
+
+Notes:
+- The WhatsApp engine stores sessions in a Docker volume (`whatsapp-sessions`) so that QR codes and session files persist between restarts.
+- For local development you may run the frontend in dev mode (`pnpm dev` or `npm run dev`) after installing dependencies.
+
+If you need to run only the frontend (no Docker):
+
+```bash
+pnpm install
+pnpm dev
+```
