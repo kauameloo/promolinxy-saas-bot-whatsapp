@@ -7,7 +7,7 @@ import { insert } from "@/lib/db"
 import type { ApiResponse, MessageLog } from "@/lib/types"
 import { z } from "zod"
 
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 
 const SendMessageSchema = z.object({
   phone: z.string().min(10, "Telefone inválido"),

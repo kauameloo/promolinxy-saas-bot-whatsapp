@@ -7,7 +7,7 @@ import { FlowService } from "@/lib/services/flow-service"
 import type { ApiResponse, MessageFlow } from "@/lib/types"
 import { z } from "zod"
 
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 
 const CreateFlowSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),

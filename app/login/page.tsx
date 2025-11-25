@@ -20,8 +20,12 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { login, user, isLoading } = useAuth()
+  const { login, user, isLoading, checkAuth } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
 
   useEffect(() => {
     if (!isLoading && user) {
