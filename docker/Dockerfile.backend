@@ -1,0 +1,52 @@
+# =====================================================
+# DOCKERFILE - Backend WhatsApp Engine
+# =====================================================
+
+FROM node:20-slim
+
+# Instala dependências do Puppeteer/Chrome
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-liberation \
+    libappindicator3-1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libgdk-pixbuf2.0-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    xdg-utils \
+    wget \
+    ca-certificates \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Define variáveis de ambiente para Puppeteer
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+WORKDIR /app
+
+# Copia arquivos de dependência
+COPY package*.json ./
+
+# Instala dependências
+RUN npm ci --only=production
+
+# Copia código fonte
+COPY . .
+
+# Build da aplicação
+RUN npm run build
+
+# Expõe porta
+EXPOSE 3001
+
+# Comando de inicialização com PM2
+CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
