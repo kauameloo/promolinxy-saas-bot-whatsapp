@@ -105,14 +105,23 @@ Agora você pode:
 ## 🛠️ Comandos Úteis para Desenvolvimento Local
 
 ```bash
-# Iniciar servidor de desenvolvimento
+# Iniciar servidor de desenvolvimento (Frontend)
 npm run dev
 
-# Build de produção
+# Build de produção (Frontend)
 npm run build
+
+# Build do Backend (WhatsApp Engine)
+npm run build:backend
+
+# Build completo (Frontend + Backend)
+npm run build:all
 
 # Iniciar em modo produção (após build)
 npm run start
+
+# Iniciar Backend com PM2
+npx pm2-runtime start ecosystem.config.js
 
 # Verificar erros de lint
 npm run lint
@@ -241,7 +250,7 @@ promolinxy-saas-bot-whatsapp/
 │   ├── ui/                       # Componentes shadcn/ui
 │   └── theme-provider.tsx        # Provider de tema
 │
-├── lib/                          # Utilitários e serviços
+├── lib/                          # Utilitários e serviços (Frontend)
 │   ├── constants/                # Constantes do sistema
 │   │   ├── config.ts             # Configurações
 │   │   └── default-flows.ts      # Fluxos padrão
@@ -255,12 +264,27 @@ promolinxy-saas-bot-whatsapp/
 │   │   └── webhook-service.ts
 │   ├── types/                    # TypeScript types
 │   ├── utils/                    # Funções utilitárias
-│   ├── whatsapp/                 # Engine WhatsApp
+│   ├── whatsapp/                 # Engine WhatsApp (API reference)
 │   │   ├── engine.ts
 │   │   ├── message-queue.ts
 │   │   └── types.ts
-│   ├── db.ts                     # Conexão com banco
+│   ├── db.ts                     # Conexão com banco (Neon)
 │   └── utils.ts                  # Utilitários gerais
+│
+├── src/                          # Backend Sources (WhatsApp Engine)
+│   └── backend/                  # Código do servidor backend
+│       ├── whatsapp-server.ts    # Servidor Express + WhatsApp
+│       ├── queue-worker.ts       # Worker de fila de mensagens
+│       └── lib/                  # Bibliotecas do backend
+│           ├── db.ts             # Conexão PostgreSQL (pg)
+│           ├── types.ts          # Tipos TypeScript
+│           ├── whatsapp-engine.ts # Engine WhatsApp
+│           └── message-queue.ts  # Fila de mensagens
+│
+├── dist/                         # Backend compilado (gerado)
+│   ├── whatsapp-server.js        # Servidor compilado
+│   ├── queue-worker.js           # Worker compilado
+│   └── lib/                      # Bibliotecas compiladas
 │
 ├── docker/                       # Configurações Docker
 │   ├── Dockerfile.frontend       # Build do frontend
@@ -282,7 +306,8 @@ promolinxy-saas-bot-whatsapp/
 ├── ecosystem.config.js           # Configuração PM2
 ├── next.config.mjs               # Configuração Next.js
 ├── package.json                  # Dependências
-├── tsconfig.json                 # TypeScript config
+├── tsconfig.json                 # TypeScript config (Frontend)
+├── tsconfig.backend.json         # TypeScript config (Backend)
 └── README.md                     # Documentação básica
 ```
 
