@@ -5,9 +5,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query, queryOne } from "@/lib/db"
 import type { ApiResponse } from "@/lib/types"
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 import { z } from "zod"
-
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 
 interface Setting {
   id: string

@@ -6,7 +6,7 @@ import { NextResponse } from "next/server"
 import { queryOne, update } from "@/lib/db"
 import type { WhatsAppSession, ApiResponse } from "@/lib/types"
 
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 
 export async function GET(): Promise<NextResponse<ApiResponse<WhatsAppSession>>> {
   try {

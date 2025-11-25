@@ -6,7 +6,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { WebhookService } from "@/lib/services/webhook-service"
 import type { ApiResponse, WebhookEvent } from "@/lib/types"
 
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 
 export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<WebhookEvent[]>>> {
   try {

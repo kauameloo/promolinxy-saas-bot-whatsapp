@@ -15,6 +15,9 @@ const UpdateMessageSchema = z.object({
   media_type: z.enum(["image", "video", "audio", "document"]).optional().nullable(),
 })
 
+// Allowed column names for dynamic updates (whitelist for safety)
+const ALLOWED_COLUMNS = ["content", "delay_minutes", "message_order", "media_url", "media_type"] as const
+
 // PUT - Atualiza uma mensagem
 export async function PUT(
   request: NextRequest,
@@ -34,25 +37,12 @@ export async function PUT(
     const values: unknown[] = []
     let paramIndex = 1
 
-    if (updates.content !== undefined) {
-      setClauses.push(`content = $${paramIndex++}`)
-      values.push(updates.content)
-    }
-    if (updates.delay_minutes !== undefined) {
-      setClauses.push(`delay_minutes = $${paramIndex++}`)
-      values.push(updates.delay_minutes)
-    }
-    if (updates.message_order !== undefined) {
-      setClauses.push(`message_order = $${paramIndex++}`)
-      values.push(updates.message_order)
-    }
-    if (updates.media_url !== undefined) {
-      setClauses.push(`media_url = $${paramIndex++}`)
-      values.push(updates.media_url)
-    }
-    if (updates.media_type !== undefined) {
-      setClauses.push(`media_type = $${paramIndex++}`)
-      values.push(updates.media_type)
+    // Only process columns that are in our whitelist
+    for (const column of ALLOWED_COLUMNS) {
+      if (updates[column] !== undefined) {
+        setClauses.push(`${column} = $${paramIndex++}`)
+        values.push(updates[column])
+      }
     }
 
     if (setClauses.length === 0) {

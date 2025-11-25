@@ -7,7 +7,7 @@ import { FlowService } from "@/lib/services/flow-service"
 import { DEFAULT_FLOWS } from "@/lib/constants/default-flows"
 import type { ApiResponse } from "@/lib/types"
 
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 
 export async function POST(): Promise<NextResponse<ApiResponse>> {
   try {

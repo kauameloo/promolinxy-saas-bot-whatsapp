@@ -51,7 +51,7 @@ const CaktoPayloadSchema = z.object({
 })
 
 // Tenant padrão (em produção, viria de header ou API key)
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 
 export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse>> {
   try {
