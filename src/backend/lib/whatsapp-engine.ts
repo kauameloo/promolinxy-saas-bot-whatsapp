@@ -235,7 +235,6 @@ export class WhatsAppEngine {
       const metadataPath = getMetadataPath(this.persistenceConfig.dataPath, this.sessionId)
       fs.writeFileSync(metadataPath, encryptedData, "utf8")
       console.log(`[WhatsApp Engine] Session metadata saved for ${this.sessionId}`)
-      console.log(`[WhatsApp Engine] Session metadata saved for ${this.sessionId}`)
     } catch (error) {
       console.error(`[WhatsApp Engine] Error saving session metadata:`, error)
     }
@@ -394,9 +393,9 @@ export class WhatsAppEngine {
       this.saveSessionMetadata()
       this.startHeartbeat()
       
-      if (this.phoneNumber) {
-        this.handlers.onReady?.(this.phoneNumber)
-      }
+      // Always call onReady handler even if phoneNumber is null
+      // The frontend relies on status being "connected", not on the phone number
+      this.handlers.onReady?.(this.phoneNumber)
     })
 
     // Handle authenticated event (session restored from storage)

@@ -114,7 +114,7 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
         })
         console.log(`[WhatsApp ${tenantId}] QR Code generated`)
       },
-      onReady: async (phoneNumber: string) => {
+      onReady: async (phoneNumber: string | null) => {
         await update("whatsapp_sessions", session!.id, {
           status: "connected",
           phone_number: phoneNumber,
@@ -399,7 +399,7 @@ async function initializeActiveConnections(): Promise<void> {
             })
             console.log(`[Server] Session ${session.tenant_id} requires QR code scan`)
           },
-          onReady: async (phoneNumber: string) => {
+          onReady: async (phoneNumber: string | null) => {
             await update("whatsapp_sessions", session.id, {
               status: "connected",
               phone_number: phoneNumber,
