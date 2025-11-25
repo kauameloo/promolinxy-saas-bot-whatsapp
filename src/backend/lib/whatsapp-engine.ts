@@ -102,6 +102,11 @@ export class WhatsAppEngine {
 
     // Handle incoming messages
     this.client.on("message", (message) => {
+      // Guard against null/undefined message properties
+      if (!message?.from || !message?.body) {
+        console.warn(`[WhatsApp ${this.sessionId}] Received message with missing properties`)
+        return
+      }
       this.handlers.onMessage?.({
         from: message.from,
         body: message.body,
@@ -197,30 +202,40 @@ export class WhatsAppEngine {
    * Gera novo QR Code
    */
   async refreshQRCode(): Promise<string | null> {
-    // Reinitialize to get new QR code
-    if (this.client) {
-      await this.disconnect()
+    try {
+      // Reinitialize to get new QR code
+      if (this.client) {
+        await this.disconnect()
+      }
       await this.initialize()
+      return this.qrCode
+    } catch (error) {
+      console.error(`[WhatsApp Engine] Error refreshing QR code:`, error)
+      this.status = "error"
+      return null
     }
-    return this.qrCode
   }
 
   /**
    * Desconecta a sessão
    */
   async disconnect(): Promise<void> {
-    if (this.client) {
+    const client = this.client
+    this.client = null
+    
+    if (client) {
       try {
-        await this.client.logout()
+        await client.logout()
       } catch (error) {
-        console.error(`[WhatsApp Engine] Logout error:`, error)
+        // Log but don't throw - logout may fail if already disconnected
+        console.warn(`[WhatsApp Engine] Logout warning:`, error)
       }
       try {
-        await this.client.destroy()
+        await client.destroy()
       } catch (error) {
-        console.error(`[WhatsApp Engine] Destroy error:`, error)
+        // Log but don't throw - destroy may fail if already destroyed
+        console.warn(`[WhatsApp Engine] Destroy warning:`, error)
       }
-      this.client = null
     }
 
     this.status = "disconnected"
