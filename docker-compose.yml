@@ -41,12 +41,13 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
-      # Use a predictable client id to match the working snippet (bot-session) by default
-      - WHATSAPP_CLIENT_ID=bot-session
+      # Session storage path (volume mounted)
       - WHATSAPP_SESSION_PATH=/app/sessions
       - WHATSAPP_PORT=3001
       - QUEUE_STATS_PORT=3002
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      # Optional: Enable session data encryption
+      # - WHATSAPP_SESSION_ENCRYPTION_KEY=${WHATSAPP_SESSION_ENCRYPTION_KEY}
     volumes:
       - whatsapp-sessions:/app/sessions
     depends_on:

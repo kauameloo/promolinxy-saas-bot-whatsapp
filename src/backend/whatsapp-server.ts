@@ -160,8 +160,10 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
 app.post("/api/whatsapp/disconnect/:tenantId", async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params
+    // Allow preserving session data for future restoration (default: false = full logout)
+    const { preserveSession } = req.body as { preserveSession?: boolean }
 
-    await whatsappManager.removeEngine(tenantId)
+    await whatsappManager.removeEngine(tenantId, preserveSession)
     stopMessageQueue(tenantId)
 
     const session = await queryOne<WhatsAppSession>(
@@ -177,7 +179,12 @@ app.post("/api/whatsapp/disconnect/:tenantId", async (req: Request, res: Respons
       })
     }
 
-    return res.json({ success: true, message: "Disconnected successfully" })
+    return res.json({ 
+      success: true, 
+      message: preserveSession 
+        ? "Disconnected. Session data preserved for future reconnection." 
+        : "Disconnected and logged out completely."
+    })
   } catch (error) {
     console.error("WhatsApp disconnect error:", error)
     return res.status(500).json({ success: false, error: "Error disconnecting" })
@@ -240,15 +247,62 @@ app.get("/api/whatsapp/sessions", (_req: Request, res: Response) => {
   return res.json({ success: true, data: sessions })
 })
 
+// Get list of persisted sessions (sessions that have saved data)
+app.get("/api/whatsapp/persisted-sessions", (_req: Request, res: Response) => {
+  try {
+    const persisted = whatsappManager.listPersistedSessions()
+    const sessionDetails = persisted.map(sessionId => ({
+      sessionId,
+      metadata: whatsappManager.getSessionMetadata(sessionId),
+    }))
+    return res.json({ success: true, data: sessionDetails })
+  } catch (error) {
+    console.error("Error listing persisted sessions:", error)
+    return res.status(500).json({ success: false, error: "Error listing persisted sessions" })
+  }
+})
+
+// Delete persisted session data
+app.delete("/api/whatsapp/session-data/:tenantId", async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params
+    
+    // First disconnect if active
+    const engine = whatsappManager.getEngine(tenantId)
+    if (engine) {
+      await whatsappManager.removeEngine(tenantId, false)
+    }
+    
+    // Delete persisted data
+    const deleted = await whatsappManager.deleteSessionData(tenantId)
+    
+    if (deleted) {
+      return res.json({ success: true, message: "Session data deleted successfully" })
+    } else {
+      return res.status(500).json({ success: false, error: "Failed to delete session data" })
+    }
+  } catch (error) {
+    console.error("Error deleting session data:", error)
+    return res.status(500).json({ success: false, error: "Error deleting session data" })
+  }
+})
+
 // Debug: return engine status for a tenant
 app.get("/api/whatsapp/debug/:tenantId", (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params
     const engine = whatsappManager.getEngine(tenantId)
-    if (!engine) {
-      return res.status(404).json({ success: false, error: "Engine not found" })
-    }
-    return res.json({ success: true, data: engine.getStatus() })
+    const hasPersistedSession = whatsappManager.hasExistingSession(tenantId)
+    const metadata = whatsappManager.getSessionMetadata(tenantId)
+    
+    return res.json({ 
+      success: true, 
+      data: {
+        engineStatus: engine?.getStatus() || null,
+        hasPersistedSession,
+        metadata,
+      }
+    })
   } catch (error) {
     console.error("Debug route error:", error)
     return res.status(500).json({ success: false, error: "Error retrieving debug status" })
@@ -289,20 +343,52 @@ function stopMessageQueue(tenantId: string): void {
 // SERVER STARTUP
 // =====================================================
 
+/**
+ * Initialize active connections on server startup
+ * 
+ * This function implements robust session restoration:
+ * 1. First, check for persisted session data (LocalAuth files)
+ * 2. Then, check database for sessions marked as connected
+ * 3. Attempt to restore sessions that have persisted data
+ */
 async function initializeActiveConnections(): Promise<void> {
   try {
-    // Find all active WhatsApp sessions and try to reconnect
-    const sessions = await query<WhatsAppSession>(
+    console.log("[Server] Checking for persisted sessions...")
+    
+    // Get list of sessions that have persisted data
+    const persistedSessions = whatsappManager.listPersistedSessions()
+    console.log(`[Server] Found ${persistedSessions.length} persisted sessions: ${persistedSessions.join(", ") || "none"}`)
+
+    // Find all active WhatsApp sessions from database
+    const dbSessions = await query<WhatsAppSession>(
       `SELECT ws.*, t.id as tenant_id 
        FROM whatsapp_sessions ws 
        JOIN tenants t ON ws.tenant_id = t.id 
-       WHERE ws.status = 'connected' AND t.status = 'active'`
+       WHERE t.status = 'active'`
     )
 
-    console.log(`[Server] Found ${sessions.length} active sessions to reconnect`)
+    console.log(`[Server] Found ${dbSessions.length} sessions in database`)
 
-    for (const session of sessions) {
+    // Prioritize sessions that have both DB record and persisted data
+    const sessionsToRestore = dbSessions.filter(session => {
+      const hasPersisted = whatsappManager.hasExistingSession(session.tenant_id)
+      if (hasPersisted) {
+        const metadata = whatsappManager.getSessionMetadata(session.tenant_id)
+        console.log(`[Server] Session ${session.tenant_id} has persisted data, last connected: ${metadata?.lastConnected || "unknown"}`)
+      }
+      return hasPersisted || session.status === "connected"
+    })
+
+    console.log(`[Server] Attempting to restore ${sessionsToRestore.length} sessions`)
+
+    for (const session of sessionsToRestore) {
       try {
+        // Update status to connecting before attempting restoration
+        await update("whatsapp_sessions", session.id, {
+          status: "connecting",
+          updated_at: new Date().toISOString(),
+        })
+
         const engine = await whatsappManager.createEngine(session.tenant_id, {
           onQRCode: async (qr: string) => {
             await update("whatsapp_sessions", session.id, {
@@ -310,6 +396,7 @@ async function initializeActiveConnections(): Promise<void> {
               qr_code: qr,
               updated_at: new Date().toISOString(),
             })
+            console.log(`[Server] Session ${session.tenant_id} requires QR code scan`)
           },
           onReady: async (phoneNumber: string) => {
             await update("whatsapp_sessions", session.id, {
@@ -319,6 +406,7 @@ async function initializeActiveConnections(): Promise<void> {
               last_connected: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
+            console.log(`[Server] Session ${session.tenant_id} restored successfully`)
             startMessageQueue(session.tenant_id, engine)
           },
           onDisconnected: async (reason: string) => {
@@ -326,14 +414,20 @@ async function initializeActiveConnections(): Promise<void> {
               status: "disconnected",
               updated_at: new Date().toISOString(),
             })
+            console.log(`[Server] Session ${session.tenant_id} disconnected: ${reason}`)
             stopMessageQueue(session.tenant_id)
           },
         })
 
         await engine.initialize()
-        console.log(`[Server] Reconnecting session for tenant ${session.tenant_id}`)
+        console.log(`[Server] Initialized session restoration for tenant ${session.tenant_id}`)
       } catch (error) {
-        console.error(`[Server] Failed to reconnect session for tenant ${session.tenant_id}:`, error)
+        console.error(`[Server] Failed to restore session for tenant ${session.tenant_id}:`, error)
+        // Update status to error
+        await update("whatsapp_sessions", session.id, {
+          status: "error",
+          updated_at: new Date().toISOString(),
+        })
       }
     }
   } catch (error) {
