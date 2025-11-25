@@ -235,7 +235,6 @@ export class WhatsAppEngine {
       const metadataPath = getMetadataPath(this.persistenceConfig.dataPath, this.sessionId)
       fs.writeFileSync(metadataPath, encryptedData, "utf8")
       console.log(`[WhatsApp Engine] Session metadata saved for ${this.sessionId}`)
-      console.log(`[WhatsApp Engine] Session metadata saved for ${this.sessionId}`)
     } catch (error) {
       console.error(`[WhatsApp Engine] Error saving session metadata:`, error)
     }
@@ -384,19 +383,37 @@ export class WhatsAppEngine {
     })
 
     // Handle ready event
-    this.client.on("ready", () => {
+    this.client.on("ready", async () => {
       this.status = "connected"
+      
+      // Try multiple approaches to get the phone number
+      let phoneNumber: string | null = null
+      
+      // Approach 1: Get from client.info.wid.user
       const info = this.client?.info
-      this.phoneNumber = info?.wid?.user || null
+      if (info?.wid?.user) {
+        phoneNumber = info.wid.user
+      }
+      // Approach 2: Try wid._serialized and extract number
+      else if (info?.wid?._serialized) {
+        const serialized = info.wid._serialized
+        const extracted = serialized.split("@")[0]
+        phoneNumber = extracted || null
+      }
+      // Approach 3: Try me property
+      else if (info?.me?.user) {
+        phoneNumber = info.me.user
+      }
+      
+      this.phoneNumber = phoneNumber
       console.log(`[WhatsApp ${this.sessionId}] Ready - Phone: ${this.phoneNumber}`)
       
       // Save session metadata for future recovery
       this.saveSessionMetadata()
       this.startHeartbeat()
       
-      if (this.phoneNumber) {
-        this.handlers.onReady?.(this.phoneNumber)
-      }
+      // Call onReady handler with phone number or empty string fallback
+      this.handlers.onReady?.(this.phoneNumber || "")
     })
 
     // Handle authenticated event (session restored from storage)
