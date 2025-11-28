@@ -189,6 +189,7 @@ export class WhatsAppEngine {
   private reconnectTimer: NodeJS.Timeout | null = null
   private lastHeartbeat: Date | null = null
   private heartbeatInterval: NodeJS.Timeout | null = null
+  private isInitializing: boolean = false
 
   constructor(sessionId: string, handlers: WhatsAppEventHandlers = {}, config?: Partial<SessionPersistenceConfig>) {
     this.sessionId = sessionId
@@ -331,12 +332,11 @@ export class WhatsAppEngine {
     console.log(`[WhatsApp Engine] Initializing session: ${this.sessionId}`)
     this.status = "connecting"
 
-    // Use tenant-specific clientId for proper session isolation (critical for multi-tenant SaaS)
-    const dataPath = this.persistenceConfig.dataPath
-    // IMPORTANT: Use sessionId (tenantId) as clientId to isolate sessions per tenant
-    const clientId = this.sessionId
-    
-    console.log(`[WhatsApp Engine] Using LocalAuth dataPath: ${dataPath}, clientId: ${clientId}`)
+  // Use clientId similar to the working snippet by default (bot-session), but allow override
+  const dataPath = this.persistenceConfig.dataPath
+  const clientId = process.env.WHATSAPP_CLIENT_ID || "bot-session"
+
+  console.log(`[WhatsApp Engine] Using LocalAuth dataPath: ${dataPath}, clientId: ${clientId}`)
     console.log(`[WhatsApp Engine] Existing session: ${this.hasExistingSession()}`)
     
     // Load previous session metadata if available
@@ -345,6 +345,9 @@ export class WhatsAppEngine {
       console.log(`[WhatsApp Engine] Previous session found for phone: ${metadata.phoneNumber}`)
     }
     
+    // Mark initializing to prevent concurrent sends while client starts
+    this.isInitializing = true
+
     this.client = new Client({
       authStrategy: new LocalAuth({
         clientId,
@@ -458,14 +461,22 @@ export class WhatsAppEngine {
       })
     })
 
-    // Initialize the client
-    await this.client.initialize()
+    try {
+      // Initialize the client
+      await this.client.initialize()
+    } finally {
+      this.isInitializing = false
+    }
   }
 
   /**
    * Envia uma mensagem de texto
    */
   async sendMessage(message: WhatsAppMessage): Promise<SendMessageResult> {
+    if (this.isInitializing) {
+      return { success: false, error: "WhatsApp engine initializing, tente novamente em alguns segundos." }
+    }
+
     if (this.status !== "connected" || !this.client) {
       return {
         success: false,
@@ -474,6 +485,20 @@ export class WhatsAppEngine {
     }
 
     try {
+      // Guard: check internal puppeteer page presence used by whatsapp-web.js
+      const internalClient = this.client as any
+      const hasPage = internalClient && (internalClient.page || internalClient.pupPage || internalClient.puppeteerPage)
+      if (!hasPage) {
+        // schedule reconnect and return friendly error
+        console.warn(`[WhatsApp Engine] sendMessage called but puppeteer page missing for ${this.sessionId}`)
+        this.status = "disconnected"
+        this.stopHeartbeat()
+        try { if (this.client) { await this.client.destroy(); } } catch (e) { console.warn(e) }
+        this.client = null
+        this.scheduleReconnect()
+        return { success: false, error: "Puppeteer page indisponível. Reconectando, tente novamente em alguns segundos." }
+      }
+
       const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
       const result = await this.client.sendMessage(chatId, message.content)
       
@@ -486,7 +511,37 @@ export class WhatsAppEngine {
         messageId: result.id._serialized,
       }
     } catch (error) {
-      console.error(`[WhatsApp Engine] Send message error:`, error)
+  console.error(`[WhatsApp Engine] Send message error:`, error)
+
+      // Detect common puppeteer/page null errors coming from whatsapp-web.js
+      const msg = error instanceof Error ? error.message : String(error)
+      if (msg.includes("reading 'evaluate'") || msg.includes("Cannot read properties of null") || msg.includes('evaluate')) {
+        // Mark session as disconnected and schedule a reconnect
+        try {
+          this.status = "disconnected"
+          this.stopHeartbeat()
+          // Attempt graceful destroy and schedule reconnect
+          if (this.client) {
+            try {
+              await this.client.destroy()
+            } catch (e) {
+              console.warn(`[WhatsApp Engine] Error destroying client after page error:`, e)
+            }
+            this.client = null
+          }
+        } catch (e) {
+          console.warn(`[WhatsApp Engine] Error while handling broken client:`, e)
+        }
+
+        // Schedule reconnect so engine tries to restore session
+        this.scheduleReconnect()
+
+        return {
+          success: false,
+          error: "Session error (puppeteer page missing). Reconnecting, tente novamente em alguns segundos.",
+        }
+      }
+
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -522,6 +577,29 @@ export class WhatsAppEngine {
       }
     } catch (error) {
       console.error(`[WhatsApp Engine] Send media error:`, error)
+      const msg = error instanceof Error ? error.message : String(error)
+      if (msg.includes("reading 'evaluate'") || msg.includes("Cannot read properties of null") || msg.includes('evaluate')) {
+        try {
+          this.status = "disconnected"
+          this.stopHeartbeat()
+          if (this.client) {
+            try {
+              await this.client.destroy()
+            } catch (e) {
+              console.warn(`[WhatsApp Engine] Error destroying client after page error:`, e)
+            }
+            this.client = null
+          }
+        } catch (e) {
+          console.warn(`[WhatsApp Engine] Error while handling broken client:`, e)
+        }
+        this.scheduleReconnect()
+        return {
+          success: false,
+          error: "Session error (puppeteer page missing). Reconnecting, tente novamente em alguns segundos.",
+        }
+      }
+
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
