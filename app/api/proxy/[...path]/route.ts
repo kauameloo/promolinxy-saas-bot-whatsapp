@@ -10,6 +10,9 @@ import { type NextRequest, NextResponse } from "next/server"
 // Backend URL - defaults to localhost for development
 const BACKEND_URL = process.env.WHATSAPP_ENGINE_URL || "http://localhost:3001"
 
+// Log the configured backend URL on module load for debugging
+console.log(`[Proxy] WHATSAPP_ENGINE_URL configured as: ${BACKEND_URL}`)
+
 // Timeout for backend requests (30 seconds)
 const REQUEST_TIMEOUT_MS = 30000
 

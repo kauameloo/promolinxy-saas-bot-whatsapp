@@ -40,26 +40,35 @@ export async function GET(): Promise<NextResponse<ApiResponse<WhatsAppSession>>>
 
 export async function POST(): Promise<NextResponse<ApiResponse>> {
   try {
-  // In production, trigger the external WhatsApp Engine service if configured.
-  // Try env var first, then default to localhost where the engine typically listens in dev.
-  const engineUrl = process.env.WHATSAPP_ENGINE_URL || "http://localhost:3001"
+    // In production, trigger the external WhatsApp Engine service if configured.
+    // Try env var first, then default to localhost where the engine typically listens in dev.
+    const engineUrl = process.env.WHATSAPP_ENGINE_URL || "http://localhost:3001"
+    const targetUrl = `${engineUrl.replace(/\/$/, "")}/api/whatsapp/connect/${DEFAULT_TENANT_ID}`
+    
+    console.log(`[WhatsApp Status API] WHATSAPP_ENGINE_URL configured as: ${engineUrl}`)
+    console.log(`[WhatsApp Status API] Attempting to connect to: ${targetUrl}`)
 
     if (engineUrl) {
       try {
-        const resp = await fetch(`${engineUrl.replace(/\/$/, "")}/api/whatsapp/connect/${DEFAULT_TENANT_ID}`, {
+        const resp = await fetch(targetUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         })
 
+        console.log(`[WhatsApp Status API] Backend response status: ${resp.status}`)
+
         if (!resp.ok) {
           // If backend failed, log and fall back to demo behavior
-          console.error("WhatsApp engine responded with error status", resp.status)
+          console.error(`[WhatsApp Status API] WhatsApp engine responded with error status: ${resp.status}`)
+          const errorBody = await resp.text()
+          console.error(`[WhatsApp Status API] Error body: ${errorBody}`)
         } else {
           const body = await resp.json()
+          console.log(`[WhatsApp Status API] Connection successful:`, body)
           return NextResponse.json({ success: true, message: body.message || "Conexão iniciada." })
         }
       } catch (err) {
-        console.error("Error contacting WhatsApp engine:", err)
+        console.error(`[WhatsApp Status API] Error contacting WhatsApp engine at ${targetUrl}:`, err)
         // fallthrough to demo behavior
       }
     }
