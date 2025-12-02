@@ -17,12 +17,14 @@ import {
   Webhook,
   Smartphone,
   LogOut,
+  BarChart3,
 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 
 const menuItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/flows", label: "Fluxos", icon: MessageSquare },
   { href: "/dashboard/customers", label: "Clientes", icon: Users },
   { href: "/dashboard/orders", label: "Pedidos", icon: ShoppingCart },

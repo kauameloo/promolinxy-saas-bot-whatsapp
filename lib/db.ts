@@ -2,17 +2,30 @@
 // DATABASE - Conexão com Neon PostgreSQL
 // =====================================================
 
-import { neon } from "@neondatabase/serverless"
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless"
 
-// Singleton para conexão do banco
-const sql = neon(process.env.DATABASE_URL!)
+// Singleton para conexão do banco (lazy initialization)
+let _sql: NeonQueryFunction<false, false> | null = null
 
-export { sql }
+function getSql(): NeonQueryFunction<false, false> {
+  if (!_sql) {
+    const connectionString = process.env.DATABASE_URL
+    if (!connectionString) {
+      throw new Error("DATABASE_URL environment variable is not set")
+    }
+    _sql = neon(connectionString)
+  }
+  return _sql
+}
 
-// Helper para queries tipadas
+// Export the getter function for direct SQL usage (tagged template literals)
+export { getSql as sql }
+
+// Helper para queries tipadas - uses the query() method for parameterized queries
 export async function query<T>(queryText: string, params?: unknown[]): Promise<T[]> {
   try {
-    const result = await sql(queryText, params)
+    const sqlInstance = getSql()
+    const result = await sqlInstance.query(queryText, params)
     return result as T[]
   } catch (error) {
     console.error("Database query error:", error)
@@ -63,6 +76,7 @@ export async function update<T>(table: string, id: string, data: Record<string, 
 // Helper para delete
 export async function remove(table: string, id: string): Promise<boolean> {
   const queryText = `DELETE FROM ${table} WHERE id = $1`
-  await sql(queryText, [id])
+  const sqlInstance = getSql()
+  await sqlInstance.query(queryText, [id])
   return true
 }

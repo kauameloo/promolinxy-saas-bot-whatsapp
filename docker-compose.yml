@@ -2,8 +2,6 @@
 # DOCKER COMPOSE - Stack completa
 # =====================================================
 
-version: '3.8'
-
 services:
   # ==========================================
   # Frontend - Next.js Dashboard
@@ -21,6 +19,8 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - CAKTO_WEBHOOK_SECRET=${CAKTO_WEBHOOK_SECRET}
+      # Tell the frontend how to reach the WhatsApp engine service inside compose
+      - WHATSAPP_ENGINE_URL=http://whatsapp-engine:3001
     depends_on:
       - postgres
     networks:
@@ -37,16 +37,30 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
+      - "3002:3002"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
+      # Session storage path (volume mounted)
       - WHATSAPP_SESSION_PATH=/app/sessions
+      - WHATSAPP_PORT=3001
+      - QUEUE_STATS_PORT=3002
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      # Optional: Enable session data encryption
+      # - WHATSAPP_SESSION_ENCRYPTION_KEY=${WHATSAPP_SESSION_ENCRYPTION_KEY}
     volumes:
       - whatsapp-sessions:/app/sessions
     depends_on:
       - postgres
+      - redis
     networks:
       - saasbot-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # ==========================================
   # PostgreSQL Database

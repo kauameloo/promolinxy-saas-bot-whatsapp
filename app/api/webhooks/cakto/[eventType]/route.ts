@@ -1,24 +1,17 @@
 // =====================================================
-// WEBHOOK CAKTO - Endpoint para receber eventos
+// WEBHOOK CAKTO PER EVENT TYPE - Endpoint para evento específico
 // =====================================================
 
 import { type NextRequest, NextResponse } from "next/server"
 import { WebhookService } from "@/lib/services/webhook-service"
 import { verifyWebhookSignature } from "@/lib/utils/crypto"
-import type { CaktoWebhookPayload, ApiResponse } from "@/lib/types"
+import type { CaktoWebhookPayload, ApiResponse, CaktoEventType } from "@/lib/types"
 import { z } from "zod"
+import { SUPPORTED_EVENTS, EVENT_LABELS } from "@/lib/constants/default-flows"
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 
-// Schema de validação do payload
+// Schema de validação do payload (sem event obrigatório - vem da URL)
 const CaktoPayloadSchema = z.object({
-  event: z.enum([
-    "boleto_gerado",
-    "pix_gerado",
-    "picpay_gerado",
-    "openfinance_nubank_gerado",
-    "checkout_abandonment",
-    "purchase_approved",
-    "purchase_refused",
-  ]),
   transaction_id: z.string().optional(),
   customer: z
     .object({
@@ -50,14 +43,28 @@ const CaktoPayloadSchema = z.object({
   timestamp: z.string().optional(),
 })
 
-// Tenant padrão (em produção, viria de header ou API key)
-import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
-
-export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse>> {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ eventType: string }> }
+): Promise<NextResponse<ApiResponse>> {
   try {
+    const { eventType } = await params
+
+    // Validate event type
+    if (!SUPPORTED_EVENTS.includes(eventType as CaktoEventType)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid event type: ${eventType}`,
+          message: `Supported events: ${SUPPORTED_EVENTS.join(", ")}`,
+        },
+        { status: 400 }
+      )
+    }
+
     // Lê o body como texto para verificação de assinatura
     const rawBody = await request.text()
-    let payload: CaktoWebhookPayload
+    let payload: Partial<CaktoWebhookPayload>
 
     try {
       payload = JSON.parse(rawBody)
@@ -66,6 +73,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     }
 
     // Verifica assinatura (se configurada)
+    // Supports both "x-cakto-signature" (Cakto-specific) and generic "x-webhook-signature" headers
+    // to provide flexibility for different webhook sources and configurations
     const signature = request.headers.get("x-cakto-signature") || request.headers.get("x-webhook-signature")
     const webhookSecret = process.env.CAKTO_WEBHOOK_SECRET
 
@@ -87,16 +96,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
           error: "Invalid payload structure",
           message: validationResult.error.errors.map((e) => e.message).join(", "),
         },
-        { status: 400 },
+        { status: 400 }
       )
     }
 
     // Extrai tenant ID (do header ou usa padrão)
     const tenantId = request.headers.get("x-tenant-id") || DEFAULT_TENANT_ID
 
+    // Add the event type from URL to payload
+    const fullPayload: CaktoWebhookPayload = {
+      ...validationResult.data,
+      event: eventType as CaktoEventType,
+    }
+
     // Processa o webhook
     const webhookService = new WebhookService(tenantId)
-    const event = await webhookService.processWebhook(validationResult.data)
+    const event = await webhookService.processWebhook(fullPayload)
 
     console.log(`Webhook processed: ${event.event_type} - ${event.id}`)
 
@@ -112,26 +127,35 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
         success: false,
         error: error instanceof Error ? error.message : "Internal server error",
       },
-      { status: 500 },
+      { status: 500 }
     )
   }
 }
 
-// Health check
-export async function GET(): Promise<NextResponse<ApiResponse>> {
+// Health check for specific event
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ eventType: string }> }
+): Promise<NextResponse<ApiResponse>> {
+  const { eventType } = await params
+
+  if (!SUPPORTED_EVENTS.includes(eventType as CaktoEventType)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Invalid event type: ${eventType}`,
+        message: `Supported events: ${SUPPORTED_EVENTS.join(", ")}`,
+      },
+      { status: 400 }
+    )
+  }
+
   return NextResponse.json({
     success: true,
-    message: "Cakto webhook endpoint is active",
+    message: `Webhook endpoint for event "${EVENT_LABELS[eventType as CaktoEventType]}" is active`,
     data: {
-      supportedEvents: [
-        "boleto_gerado",
-        "pix_gerado",
-        "picpay_gerado",
-        "openfinance_nubank_gerado",
-        "checkout_abandonment",
-        "purchase_approved",
-        "purchase_refused",
-      ],
+      eventType,
+      eventLabel: EVENT_LABELS[eventType as CaktoEventType],
     },
   })
 }

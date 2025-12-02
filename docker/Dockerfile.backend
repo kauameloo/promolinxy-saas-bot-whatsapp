@@ -34,19 +34,47 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 WORKDIR /app
 
 # Copia arquivos de dependência
-COPY package*.json ./
+COPY package*.json pnpm-lock.yaml* yarn.lock* ./
 
-# Instala dependências
-RUN npm ci --only=production
+# Instala dependências - suporta npm, yarn e pnpm
+RUN \
+  # Install full deps (dev + prod) because we need build-time tools (typescript, etc.)
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm install --frozen-lockfile; \
+  elif [ -f yarn.lock ]; then \
+    yarn --frozen-lockfile; \
+  else \
+    npm ci; \
+  fi
 
 # Copia código fonte
 COPY . .
 
-# Build da aplicação
-RUN npm run build
+# Build do backend (TypeScript -> JavaScript)
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm run build:backend; \
+  elif [ -f yarn.lock ]; then \
+    yarn build:backend; \
+  else \
+    npm run build:backend; \
+  fi
 
-# Expõe porta
-EXPOSE 3001
+# Cria diretório de logs
+RUN mkdir -p /app/logs /app/sessions
+
+# Remove dev dependencies after build to keep image lean
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    pnpm prune --prod || true; \
+  elif [ -f yarn.lock ]; then \
+    yarn install --production --frozen-lockfile || true; \
+  else \
+    npm prune --production || true; \
+  fi
+
+# Expõe portas (WhatsApp server + Queue stats)
+EXPOSE 3001 3002
 
 # Comando de inicialização com PM2
 CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]

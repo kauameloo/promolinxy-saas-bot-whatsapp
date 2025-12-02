@@ -1,0 +1,28 @@
+# Node modules and build outputs should not be sent to the daemon
+node_modules
+.next
+dist
+build
+pnpm-lock.yaml
+npm-debug.log
+yarn.lock
+pnpm-store
+
+# Git
+.git
+
+# Local env
+.env
+.env.local
+.env.development.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Editor
+.vscode
+.idea
