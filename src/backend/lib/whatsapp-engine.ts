@@ -23,6 +23,12 @@ import * as crypto from "crypto"
 const WWEBJS_AUTH_DIR = ".wwebjs_auth"
 
 /**
+ * Chromium lock file names that may be left by crashed processes
+ * These files prevent new browser instances from starting if not cleaned up properly
+ */
+const CHROMIUM_LOCK_FILES = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+
+/**
  * Session persistence configuration
  * Implements best practices from leading SaaS platforms (Z-API, Take Blip, etc.)
  */
@@ -69,10 +75,38 @@ function getMetadataPath(dataPath: string, sessionId: string): string {
 }
 
 /**
- * Gets the LocalAuth directory path for a session
+ * Gets the LocalAuth directory path for a session/clientId
  */
 function getAuthDir(dataPath: string, sessionId: string): string {
   return path.join(dataPath, WWEBJS_AUTH_DIR, `session-${sessionId}`)
+}
+
+/**
+ * Removes Chromium profile lock files that may have been left by a crashed process
+ * This resolves the "profile appears to be in use by another Chromium process" error
+ */
+function removeChromiumLockFiles(authDir: string): void {
+  // Check both the auth directory and the Default profile subdirectory
+  const dirsToCheck = [
+    authDir,
+    path.join(authDir, "Default"),
+  ]
+  
+  for (const dir of dirsToCheck) {
+    if (!fs.existsSync(dir)) continue
+    
+    for (const lockFile of CHROMIUM_LOCK_FILES) {
+      const lockPath = path.join(dir, lockFile)
+      try {
+        if (fs.existsSync(lockPath)) {
+          fs.unlinkSync(lockPath)
+          console.log(`[WhatsApp Engine] Removed stale lock file: ${lockPath}`)
+        }
+      } catch (error) {
+        console.warn(`[WhatsApp Engine] Could not remove lock file ${lockPath}:`, error)
+      }
+    }
+  }
 }
 
 /**
@@ -332,12 +366,17 @@ export class WhatsAppEngine {
     console.log(`[WhatsApp Engine] Initializing session: ${this.sessionId}`)
     this.status = "connecting"
 
-  // Use clientId similar to the working snippet by default (bot-session), but allow override
-  const dataPath = this.persistenceConfig.dataPath
-  const clientId = process.env.WHATSAPP_CLIENT_ID || "bot-session"
+    // Use clientId similar to the working snippet by default (bot-session), but allow override
+    const dataPath = this.persistenceConfig.dataPath
+    const clientId = process.env.WHATSAPP_CLIENT_ID || "bot-session"
 
-  console.log(`[WhatsApp Engine] Using LocalAuth dataPath: ${dataPath}, clientId: ${clientId}`)
+    console.log(`[WhatsApp Engine] Using LocalAuth dataPath: ${dataPath}, clientId: ${clientId}`)
     console.log(`[WhatsApp Engine] Existing session: ${this.hasExistingSession()}`)
+    
+    // Remove stale Chromium lock files that may have been left by a crashed process
+    // This prevents the "profile appears to be in use by another Chromium process" error
+    const authDir = getAuthDir(dataPath, clientId)
+    removeChromiumLockFiles(authDir)
     
     // Load previous session metadata if available
     const metadata = this.loadSessionMetadata()
@@ -365,6 +404,16 @@ export class WhatsAppEngine {
           "--no-zygote",
           "--single-process",
           "--disable-gpu",
+          // Additional flags to prevent profile lock issues
+          "--disable-background-networking",
+          "--disable-default-apps",
+          "--disable-extensions",
+          "--disable-sync",
+          "--disable-translate",
+          "--metrics-recording-only",
+          "--mute-audio",
+          "--no-default-browser-check",
+          "--safebrowsing-disable-auto-update",
         ],
       },
     })
