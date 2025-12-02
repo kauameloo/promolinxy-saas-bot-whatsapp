@@ -310,6 +310,22 @@ app.get("/api/whatsapp/debug/:tenantId", (req: Request, res: Response) => {
   }
 })
 
+// Cleanup legacy session data (old shared "bot-session" clientId)
+app.post("/api/whatsapp/cleanup-legacy", async (_req: Request, res: Response) => {
+  try {
+    const cleaned = await whatsappManager.cleanupLegacySessionData()
+    return res.json({ 
+      success: true, 
+      message: cleaned 
+        ? "Legacy session data cleaned up successfully" 
+        : "No legacy session data found to clean"
+    })
+  } catch (error) {
+    console.error("Legacy cleanup error:", error)
+    return res.status(500).json({ success: false, error: "Error cleaning up legacy session data" })
+  }
+})
+
 // =====================================================
 // MESSAGE QUEUE MANAGEMENT
 // =====================================================
@@ -348,12 +364,18 @@ function stopMessageQueue(tenantId: string): void {
  * Initialize active connections on server startup
  * 
  * This function implements robust session restoration:
- * 1. First, check for persisted session data (LocalAuth files)
- * 2. Then, check database for sessions marked as connected
- * 3. Attempt to restore sessions that have persisted data
+ * 1. First, clean up any legacy session data from old shared clientId
+ * 2. Check for persisted session data (LocalAuth files)
+ * 3. Then, check database for sessions marked as connected
+ * 4. Attempt to restore sessions that have persisted data
  */
 async function initializeActiveConnections(): Promise<void> {
   try {
+    // Clean up legacy session data from old shared "bot-session" clientId
+    // This prevents Chromium profile lock conflicts
+    console.log("[Server] Cleaning up legacy session data...")
+    await whatsappManager.cleanupLegacySessionData()
+    
     console.log("[Server] Checking for persisted sessions...")
     
     // Get list of sessions that have persisted data

@@ -86,10 +86,12 @@ function getAuthDir(dataPath: string, sessionId: string): string {
  * This resolves the "profile appears to be in use by another Chromium process" error
  */
 function removeChromiumLockFiles(authDir: string): void {
-  // Check both the auth directory and the Default profile subdirectory
+  // Check the auth directory and common profile subdirectories
+  // Chromium can create locks in various subdirectories
   const dirsToCheck = [
     authDir,
     path.join(authDir, "Default"),
+    path.join(authDir, "Profile 1"),
   ]
   
   for (const dir of dirsToCheck) {
@@ -106,6 +108,26 @@ function removeChromiumLockFiles(authDir: string): void {
         console.warn(`[WhatsApp Engine] Could not remove lock file ${lockPath}:`, error)
       }
     }
+  }
+  
+  // Also try to remove any .lock files that might exist
+  try {
+    if (fs.existsSync(authDir)) {
+      const files = fs.readdirSync(authDir)
+      for (const file of files) {
+        if (file.endsWith('.lock') || file === 'lockfile') {
+          const lockPath = path.join(authDir, file)
+          try {
+            fs.unlinkSync(lockPath)
+            console.log(`[WhatsApp Engine] Removed stale lock file: ${lockPath}`)
+          } catch (e) {
+            console.warn(`[WhatsApp Engine] Could not remove lock file ${lockPath}:`, e)
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // Directory might not exist yet, that's fine
   }
 }
 
@@ -366,9 +388,10 @@ export class WhatsAppEngine {
     console.log(`[WhatsApp Engine] Initializing session: ${this.sessionId}`)
     this.status = "connecting"
 
-    // Use clientId similar to the working snippet by default (bot-session), but allow override
+    // Use sessionId as clientId for proper per-tenant session isolation
+    // This ensures each tenant has their own auth directory and prevents lock conflicts
     const dataPath = this.persistenceConfig.dataPath
-    const clientId = process.env.WHATSAPP_CLIENT_ID || "bot-session"
+    const clientId = this.sessionId
 
     console.log(`[WhatsApp Engine] Using LocalAuth dataPath: ${dataPath}, clientId: ${clientId}`)
     console.log(`[WhatsApp Engine] Existing session: ${this.hasExistingSession()}`)
@@ -865,6 +888,49 @@ class WhatsAppManager {
       return true
     } catch (error) {
       console.error(`[WhatsApp Manager] Error deleting session data for ${sessionId}:`, error)
+      return false
+    }
+  }
+
+  /**
+   * Cleans up legacy session data from the old shared clientId naming.
+   * Previously, all tenants shared a single "bot-session" clientId which caused
+   * Chromium profile lock conflicts. This method removes that legacy data.
+   * 
+   * @returns true if cleanup was performed, false if no legacy data found
+   */
+  async cleanupLegacySessionData(): Promise<boolean> {
+    const legacyClientId = "bot-session"
+    try {
+      const legacyAuthDir = getAuthDir(this.config.dataPath, legacyClientId)
+      const legacySessionDir = getSessionDir(this.config.dataPath, legacyClientId)
+      
+      let cleaned = false
+      
+      // Remove legacy auth directory if it exists
+      if (fs.existsSync(legacyAuthDir)) {
+        console.log(`[WhatsApp Manager] Cleaning up legacy auth directory: ${legacyAuthDir}`)
+        // First remove any lock files
+        removeChromiumLockFiles(legacyAuthDir)
+        // Then remove the entire directory
+        fs.rmSync(legacyAuthDir, { recursive: true })
+        cleaned = true
+      }
+      
+      // Remove legacy session directory if it exists
+      if (fs.existsSync(legacySessionDir)) {
+        console.log(`[WhatsApp Manager] Cleaning up legacy session directory: ${legacySessionDir}`)
+        fs.rmSync(legacySessionDir, { recursive: true })
+        cleaned = true
+      }
+      
+      if (cleaned) {
+        console.log(`[WhatsApp Manager] Legacy session data cleanup completed`)
+      }
+      
+      return cleaned
+    } catch (error) {
+      console.error(`[WhatsApp Manager] Error cleaning up legacy session data:`, error)
       return false
     }
   }
