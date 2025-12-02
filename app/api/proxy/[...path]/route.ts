@@ -41,6 +41,79 @@ function getForwardHeaders(request: NextRequest): HeadersInit {
 }
 
 /**
+ * Parse the response based on content type
+ */
+async function parseResponse(response: Response): Promise<NextResponse> {
+  const contentType = response.headers.get("content-type") || ""
+  
+  // Handle JSON responses
+  if (contentType.includes("application/json")) {
+    try {
+      const data = await response.json()
+      return NextResponse.json(data, { status: response.status })
+    } catch {
+      // If JSON parsing fails, return empty response with status
+      return new NextResponse(null, { status: response.status })
+    }
+  }
+  
+  // Handle text responses
+  if (contentType.includes("text/")) {
+    const text = await response.text()
+    return new NextResponse(text, {
+      status: response.status,
+      headers: { "Content-Type": contentType },
+    })
+  }
+  
+  // Handle empty responses (204 No Content, etc.)
+  if (response.status === 204 || response.headers.get("content-length") === "0") {
+    return new NextResponse(null, { status: response.status })
+  }
+  
+  // For other content types, try to return as JSON (most common case for this API)
+  try {
+    const data = await response.json()
+    return NextResponse.json(data, { status: response.status })
+  } catch {
+    // Fallback: return the response body as-is
+    const body = await response.arrayBuffer()
+    return new NextResponse(body, {
+      status: response.status,
+      headers: contentType ? { "Content-Type": contentType } : undefined,
+    })
+  }
+}
+
+/**
+ * Get request body and headers for methods that send data
+ */
+async function getRequestBodyAndHeaders(
+  request: NextRequest
+): Promise<{ body: string | undefined; headers: HeadersInit }> {
+  const forwardHeaders = getForwardHeaders(request)
+  const requestContentType = request.headers.get("content-type") || ""
+  
+  // Only try to parse JSON if content-type indicates JSON
+  if (requestContentType.includes("application/json")) {
+    try {
+      const body = JSON.stringify(await request.json())
+      return {
+        body,
+        headers: { ...forwardHeaders, "Content-Type": "application/json" },
+      }
+    } catch {
+      // JSON parsing failed, log warning
+      console.warn("[Proxy] Failed to parse request JSON body")
+      return { body: undefined, headers: forwardHeaders }
+    }
+  }
+  
+  // For other content types or no body
+  return { body: undefined, headers: forwardHeaders }
+}
+
+/**
  * Handle GET requests
  */
 export async function GET(
@@ -64,8 +137,7 @@ export async function GET(
 
     clearTimeout(timeoutId)
 
-    const data = await response.json()
-    return NextResponse.json(data, { status: response.status })
+    return parseResponse(response)
   } catch (error) {
     console.error(`[Proxy] GET ${url} error:`, error)
     return handleProxyError(error)
@@ -87,28 +159,18 @@ export async function POST(
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
-    let body: string | undefined
-    try {
-      body = JSON.stringify(await request.json())
-    } catch {
-      // No body or invalid JSON
-      body = undefined
-    }
+    const { body, headers } = await getRequestBodyAndHeaders(request)
 
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        ...getForwardHeaders(request),
-        "Content-Type": "application/json",
-      },
+      headers,
       body,
       signal: controller.signal,
     })
 
     clearTimeout(timeoutId)
 
-    const data = await response.json()
-    return NextResponse.json(data, { status: response.status })
+    return parseResponse(response)
   } catch (error) {
     console.error(`[Proxy] POST ${url} error:`, error)
     return handleProxyError(error)
@@ -130,27 +192,18 @@ export async function PUT(
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
-    let body: string | undefined
-    try {
-      body = JSON.stringify(await request.json())
-    } catch {
-      body = undefined
-    }
+    const { body, headers } = await getRequestBodyAndHeaders(request)
 
     const response = await fetch(url, {
       method: "PUT",
-      headers: {
-        ...getForwardHeaders(request),
-        "Content-Type": "application/json",
-      },
+      headers,
       body,
       signal: controller.signal,
     })
 
     clearTimeout(timeoutId)
 
-    const data = await response.json()
-    return NextResponse.json(data, { status: response.status })
+    return parseResponse(response)
   } catch (error) {
     console.error(`[Proxy] PUT ${url} error:`, error)
     return handleProxyError(error)
@@ -180,8 +233,7 @@ export async function DELETE(
 
     clearTimeout(timeoutId)
 
-    const data = await response.json()
-    return NextResponse.json(data, { status: response.status })
+    return parseResponse(response)
   } catch (error) {
     console.error(`[Proxy] DELETE ${url} error:`, error)
     return handleProxyError(error)
