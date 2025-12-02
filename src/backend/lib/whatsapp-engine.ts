@@ -23,6 +23,12 @@ import * as crypto from "crypto"
 const WWEBJS_AUTH_DIR = ".wwebjs_auth"
 
 /**
+ * Chromium lock file names that may be left by crashed processes
+ * These files prevent new browser instances from starting if not cleaned up properly
+ */
+const CHROMIUM_LOCK_FILES = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+
+/**
  * Session persistence configuration
  * Implements best practices from leading SaaS platforms (Z-API, Take Blip, etc.)
  */
@@ -69,17 +75,10 @@ function getMetadataPath(dataPath: string, sessionId: string): string {
 }
 
 /**
- * Gets the LocalAuth directory path for a session
+ * Gets the LocalAuth directory path for a session/clientId
  */
 function getAuthDir(dataPath: string, sessionId: string): string {
   return path.join(dataPath, WWEBJS_AUTH_DIR, `session-${sessionId}`)
-}
-
-/**
- * Gets the LocalAuth directory path for a clientId
- */
-function getAuthDirByClientId(dataPath: string, clientId: string): string {
-  return path.join(dataPath, WWEBJS_AUTH_DIR, `session-${clientId}`)
 }
 
 /**
@@ -87,8 +86,6 @@ function getAuthDirByClientId(dataPath: string, clientId: string): string {
  * This resolves the "profile appears to be in use by another Chromium process" error
  */
 function removeChromiumLockFiles(authDir: string): void {
-  const lockFiles = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
-  
   // Check both the auth directory and the Default profile subdirectory
   const dirsToCheck = [
     authDir,
@@ -98,7 +95,7 @@ function removeChromiumLockFiles(authDir: string): void {
   for (const dir of dirsToCheck) {
     if (!fs.existsSync(dir)) continue
     
-    for (const lockFile of lockFiles) {
+    for (const lockFile of CHROMIUM_LOCK_FILES) {
       const lockPath = path.join(dir, lockFile)
       try {
         if (fs.existsSync(lockPath)) {
@@ -378,7 +375,7 @@ export class WhatsAppEngine {
     
     // Remove stale Chromium lock files that may have been left by a crashed process
     // This prevents the "profile appears to be in use by another Chromium process" error
-    const authDir = getAuthDirByClientId(dataPath, clientId)
+    const authDir = getAuthDir(dataPath, clientId)
     removeChromiumLockFiles(authDir)
     
     // Load previous session metadata if available
