@@ -26,7 +26,12 @@ const WWEBJS_AUTH_DIR = ".wwebjs_auth"
  * Chromium lock file names that may be left by crashed processes
  * These files prevent new browser instances from starting if not cleaned up properly
  */
-const CHROMIUM_LOCK_FILES = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+const CHROMIUM_LOCK_FILES = ["SingletonLock", "SingletonSocket", "SingletonCookie", "lockfile"]
+
+/**
+ * Additional lock file patterns to check
+ */
+const LOCK_FILE_EXTENSIONS = [".lock"]
 
 /**
  * Session persistence configuration
@@ -84,51 +89,52 @@ function getAuthDir(dataPath: string, sessionId: string): string {
 /**
  * Removes Chromium profile lock files that may have been left by a crashed process
  * This resolves the "profile appears to be in use by another Chromium process" error
+ * 
+ * Recursively searches all subdirectories to ensure complete cleanup
  */
 function removeChromiumLockFiles(authDir: string): void {
-  // Check the auth directory and common profile subdirectories
-  // Chromium can create locks in various subdirectories
-  const dirsToCheck = [
-    authDir,
-    path.join(authDir, "Default"),
-    path.join(authDir, "Profile 1"),
-  ]
-  
-  for (const dir of dirsToCheck) {
-    if (!fs.existsSync(dir)) continue
-    
-    for (const lockFile of CHROMIUM_LOCK_FILES) {
-      const lockPath = path.join(dir, lockFile)
-      try {
-        if (fs.existsSync(lockPath)) {
-          fs.unlinkSync(lockPath)
-          console.log(`[WhatsApp Engine] Removed stale lock file: ${lockPath}`)
-        }
-      } catch (error) {
-        console.warn(`[WhatsApp Engine] Could not remove lock file ${lockPath}:`, error)
-      }
-    }
+  if (!fs.existsSync(authDir)) {
+    return
   }
-  
-  // Also try to remove any .lock files that might exist
-  try {
-    if (fs.existsSync(authDir)) {
-      const files = fs.readdirSync(authDir)
-      for (const file of files) {
-        if (file.endsWith('.lock') || file === 'lockfile') {
-          const lockPath = path.join(authDir, file)
-          try {
-            fs.unlinkSync(lockPath)
-            console.log(`[WhatsApp Engine] Removed stale lock file: ${lockPath}`)
-          } catch (e) {
-            console.warn(`[WhatsApp Engine] Could not remove lock file ${lockPath}:`, e)
+
+  /**
+   * Recursively remove lock files from a directory and all subdirectories
+   */
+  function removeLockFilesRecursively(dir: string): void {
+    try {
+      if (!fs.existsSync(dir)) return
+      
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name)
+        
+        if (entry.isDirectory()) {
+          // Recursively process subdirectories
+          removeLockFilesRecursively(fullPath)
+        } else if (entry.isFile()) {
+          // Check if this is a lock file
+          const isLockFile = 
+            CHROMIUM_LOCK_FILES.includes(entry.name) ||
+            LOCK_FILE_EXTENSIONS.some(ext => entry.name.endsWith(ext))
+          
+          if (isLockFile) {
+            try {
+              fs.unlinkSync(fullPath)
+              console.log(`[WhatsApp Engine] Removed stale lock file: ${fullPath}`)
+            } catch (e) {
+              console.warn(`[WhatsApp Engine] Could not remove lock file ${fullPath}:`, e)
+            }
           }
         }
       }
+    } catch (error) {
+      console.warn(`[WhatsApp Engine] Error scanning directory ${dir} for lock files:`, error)
     }
-  } catch (error) {
-    // Directory might not exist yet, that's fine
   }
+
+  // Remove lock files recursively from the entire auth directory
+  removeLockFilesRecursively(authDir)
 }
 
 /**
@@ -922,15 +928,30 @@ class WhatsAppManager {
         // First remove any lock files
         removeChromiumLockFiles(legacyAuthDir)
         // Then remove the entire directory
-        fs.rmSync(legacyAuthDir, { recursive: true })
-        cleaned = true
+        try {
+          fs.rmSync(legacyAuthDir, { recursive: true, force: true })
+          cleaned = true
+        } catch (rmError) {
+          console.error(`[WhatsApp Manager] Error removing legacy auth directory:`, rmError)
+        }
       }
       
       // Remove legacy session directory if it exists
       if (fs.existsSync(legacySessionDir)) {
         console.log(`[WhatsApp Manager] Cleaning up legacy session directory: ${legacySessionDir}`)
-        fs.rmSync(legacySessionDir, { recursive: true })
-        cleaned = true
+        try {
+          fs.rmSync(legacySessionDir, { recursive: true, force: true })
+          cleaned = true
+        } catch (rmError) {
+          console.error(`[WhatsApp Manager] Error removing legacy session directory:`, rmError)
+        }
+      }
+      
+      // Also clean up any orphaned lock files in the entire .wwebjs_auth directory
+      const authBaseDir = path.join(this.config.dataPath, WWEBJS_AUTH_DIR)
+      if (fs.existsSync(authBaseDir)) {
+        console.log(`[WhatsApp Manager] Scanning for orphaned lock files in: ${authBaseDir}`)
+        removeChromiumLockFiles(authBaseDir)
       }
       
       if (cleaned) {
