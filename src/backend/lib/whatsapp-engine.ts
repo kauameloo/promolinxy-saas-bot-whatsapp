@@ -897,7 +897,16 @@ class WhatsAppManager {
    * Previously, all tenants shared a single "bot-session" clientId which caused
    * Chromium profile lock conflicts. This method removes that legacy data.
    * 
-   * @returns true if cleanup was performed, false if no legacy data found
+   * This operation is safe to call multiple times and is idempotent.
+   * 
+   * @returns true if cleanup was performed, false if no legacy data found or on error
+   * @throws Never throws - errors are logged and return false
+   * 
+   * @example
+   * const cleaned = await manager.cleanupLegacySessionData()
+   * if (cleaned) {
+   *   console.log("Legacy data was removed")
+   * }
    */
   async cleanupLegacySessionData(): Promise<boolean> {
     const legacyClientId = "bot-session"
@@ -930,6 +939,8 @@ class WhatsAppManager {
       
       return cleaned
     } catch (error) {
+      // Log the error but return false to indicate cleanup was not completed
+      // This prevents server startup from failing due to cleanup issues
       console.error(`[WhatsApp Manager] Error cleaning up legacy session data:`, error)
       return false
     }

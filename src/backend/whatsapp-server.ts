@@ -311,8 +311,20 @@ app.get("/api/whatsapp/debug/:tenantId", (req: Request, res: Response) => {
 })
 
 // Cleanup legacy session data (old shared "bot-session" clientId)
-app.post("/api/whatsapp/cleanup-legacy", async (_req: Request, res: Response) => {
+// This endpoint is admin-only and requires the ADMIN_SECRET header for manual invocation
+// Note: This cleanup also runs automatically on server startup
+app.post("/api/whatsapp/cleanup-legacy", async (req: Request, res: Response) => {
   try {
+    // Basic admin check - require ADMIN_SECRET header or be localhost
+    const adminSecret = process.env.ADMIN_SECRET
+    const providedSecret = req.headers["x-admin-secret"]
+    const isLocalhost = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1"
+    
+    if (adminSecret && providedSecret !== adminSecret && !isLocalhost) {
+      console.warn("[Server] Unauthorized cleanup-legacy attempt")
+      return res.status(403).json({ success: false, error: "Unauthorized" })
+    }
+    
     const cleaned = await whatsappManager.cleanupLegacySessionData()
     return res.json({ 
       success: true, 
