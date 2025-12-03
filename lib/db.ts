@@ -21,14 +21,20 @@ function getSql(): NeonQueryFunction<false, false> {
 // Export the getter function for direct SQL usage (tagged template literals)
 export { getSql as sql }
 
-// Helper para queries tipadas - uses the query() method for parameterized queries
+// Helper for typed queries with parameterized statements
 export async function query<T>(queryText: string, params?: unknown[]): Promise<T[]> {
   try {
     const sqlInstance = getSql()
-    const result = await sqlInstance.query(queryText, params)
+    // Neon serverless driver expects direct call with query and params
+    const result = await sqlInstance(queryText, params || [])
     return result as T[]
   } catch (error) {
     console.error("Database query error:", error)
+    console.error("Query:", queryText)
+    // Only log params in development to avoid exposing sensitive data
+    if (process.env.NODE_ENV === "development") {
+      console.error("Params:", params)
+    }
     throw error
   }
 }
@@ -77,6 +83,6 @@ export async function update<T>(table: string, id: string, data: Record<string, 
 export async function remove(table: string, id: string): Promise<boolean> {
   const queryText = `DELETE FROM ${table} WHERE id = $1`
   const sqlInstance = getSql()
-  await sqlInstance.query(queryText, [id])
+  await sqlInstance(queryText, [id])
   return true
 }

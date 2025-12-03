@@ -22,6 +22,11 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
     })
   } catch (error) {
     console.error("List events error:", error)
-    return NextResponse.json({ success: false, error: "Erro ao listar eventos" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Erro ao listar eventos"
+    return NextResponse.json({ 
+      success: false, 
+      error: errorMessage,
+      details: process.env.NODE_ENV === "development" ? String(error) : undefined
+    }, { status: 500 })
   }
 }

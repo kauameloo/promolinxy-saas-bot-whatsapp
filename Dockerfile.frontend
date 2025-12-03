@@ -26,7 +26,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Environment variables needed at build time
 ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* vars must be set at build time to be embedded in the bundle
+# These can be overridden by passing --build-arg during docker build
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 RUN \
   if [ -f pnpm-lock.yaml ]; then \
