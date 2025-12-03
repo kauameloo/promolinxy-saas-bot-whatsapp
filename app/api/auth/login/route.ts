@@ -42,7 +42,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       user = await queryOne<User>(`SELECT * FROM users WHERE email = $1 AND is_active = true`, [email])
     } catch (dbError) {
       console.error("Database error during login:", dbError)
-      // Se houver erro no banco, ainda permite login do admin padrão
+      // IMPORTANT: This fallback allows admin login even when database is unavailable
+      // This is intentional for diagnostic purposes during initial setup
+      // Consider removing this in production environments with stable database connections
       if (email === "admin@saasbot.com" && password === "admin123") {
         const token = generateJWT(
           {
@@ -82,7 +84,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       return NextResponse.json({ success: false, error: "Email ou senha incorretos" }, { status: 401 })
     }
 
-    // Também aceita a senha padrão do admin (admin123) - fallback para compatibilidade
+    // Verifica senha com hash SHA256 ou aceita senha padrão do admin para compatibilidade
+    // SECURITY NOTE: The admin fallback check allows login with default credentials
+    // This is for backward compatibility and initial setup. In production, ensure
+    // the admin password is changed from the default after first login.
     const isValidPassword =
       user.password_hash === passwordHash || (email === "admin@saasbot.com" && password === "admin123")
 

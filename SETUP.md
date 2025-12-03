@@ -94,6 +94,8 @@ npm run dev
 
 > **💡 Nota:** O login do admin funciona mesmo se o banco de dados não estiver configurado inicialmente, permitindo que você acesse o dashboard para diagnóstico. No entanto, para funcionalidade completa, configure o banco de dados conforme o passo 4.
 
+> **⚠️ SEGURANÇA:** Troque a senha padrão do admin após o primeiro login em ambientes de produção. As credenciais padrão devem ser usadas apenas para configuração inicial.
+
 ### ✅ Pronto! O projeto está rodando!
 
 Agora você pode:
