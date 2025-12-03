@@ -6,6 +6,7 @@
 
 import useSWR, { type SWRConfiguration } from "swr"
 import { useAuth } from "./use-auth"
+import { getApiUrl } from "@/lib/utils/api-url"
 
 const fetcher = async (url: string, token?: string | null) => {
   const headers: HeadersInit = {
@@ -16,7 +17,8 @@ const fetcher = async (url: string, token?: string | null) => {
     headers["Authorization"] = `Bearer ${token}`
   }
 
-  const response = await fetch(url, { headers })
+  const fullUrl = getApiUrl(url)
+  const response = await fetch(fullUrl, { headers })
   const data = await response.json()
 
   if (!data.success) {
@@ -44,7 +46,8 @@ export async function apiPost<T>(url: string, body: unknown, token?: string | nu
     headers["Authorization"] = `Bearer ${token}`
   }
 
-  const response = await fetch(url, {
+  const fullUrl = getApiUrl(url)
+  const response = await fetch(fullUrl, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -68,7 +71,8 @@ export async function apiPut<T>(url: string, body: unknown, token?: string | nul
     headers["Authorization"] = `Bearer ${token}`
   }
 
-  const response = await fetch(url, {
+  const fullUrl = getApiUrl(url)
+  const response = await fetch(fullUrl, {
     method: "PUT",
     headers,
     body: JSON.stringify(body),
@@ -92,7 +96,8 @@ export async function apiDelete(url: string, token?: string | null): Promise<voi
     headers["Authorization"] = `Bearer ${token}`
   }
 
-  const response = await fetch(url, {
+  const fullUrl = getApiUrl(url)
+  const response = await fetch(fullUrl, {
     method: "DELETE",
     headers,
   })
