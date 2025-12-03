@@ -56,3 +56,14 @@ coverage/
 *.pid
 *.seed
 *.pid.lock
+
+# VPS deployment data
+pgdata/
+postgres-saas/
+caddy_data/
+caddy_config/
+n8n/
+*.sql.backup
+backup-*.sql
+backups-*.tar.gz
+.build.log

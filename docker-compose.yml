@@ -1,60 +1,145 @@
-# =====================================================
-# DOCKER COMPOSE - Stack completa
-# =====================================================
+##############################
+#         NETWORKS
+##############################
+networks:
+  stack-network:
+    driver: bridge
 
+##############################
+#         SERVICES
+##############################
 services:
-  # ==========================================
-  # Frontend - Next.js Dashboard
-  # ==========================================
-  frontend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.frontend
-    container_name: saasbot-frontend
+
+  ###################################################
+  # POSTGRES DO TYPEBOT
+  ###################################################
+  postgres-typebot:
+    image: postgres:14
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: typebot
+      POSTGRES_PASSWORD: typebotpass
+      POSTGRES_DB: typebot
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    networks:
+      - stack-network
+
+  ###################################################
+  # POSTGRES DO SAAS
+  ###################################################
+  postgres-saas:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-saasbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-saasbot123}
+      POSTGRES_DB: ${POSTGRES_DB:-saasbot}
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./postgres-saas:/var/lib/postgresql/data
+      - ./scripts:/docker-entrypoint-initdb.d
+    networks:
+      - stack-network
+
+  ###################################################
+  # REDIS DO SAAS
+  ###################################################
+  redis:
+    image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - CAKTO_WEBHOOK_SECRET=${CAKTO_WEBHOOK_SECRET}
-      # Tell the frontend how to reach the WhatsApp engine service inside compose
-      - WHATSAPP_ENGINE_URL=http://whatsapp-engine:3001
-    depends_on:
-      - postgres
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
     networks:
-      - saasbot-network
+      - stack-network
 
-  # ==========================================
-  # Backend - WhatsApp Engine
-  # ==========================================
-  whatsapp-engine:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
-    container_name: saasbot-whatsapp
+  ###################################################
+  # TYPEBOT BUILDER
+  ###################################################
+  typebot-builder:
+    image: baptistearno/typebot-builder:latest
     restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://typebot:typebotpass@postgres-typebot:5432/typebot
+      ENCRYPTION_SECRET: bfba0a34f198a3398e2dbfae4b4d8fff
+      NEXTAUTH_URL: https://builder.promolinxy.online
+      NEXT_PUBLIC_VIEWER_URL: https://bot.promolinxy.online
+      NEXTAUTH_SECRET: verysecretstringhere123
+      GITHUB_CLIENT_ID: Ov23liZqwKvOK4MI2OiQ
+      GITHUB_CLIENT_SECRET: 5c936d4d3322391613246421cc6e00cd027ec3bf
+    networks:
+      - stack-network
+    depends_on:
+      - postgres-typebot
+
+  ###################################################
+  # TYPEBOT VIEWER
+  ###################################################
+  typebot-viewer:
+    image: baptistearno/typebot-viewer:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://typebot:typebotpass@postgres-typebot:5432/typebot
+      ENCRYPTION_SECRET: bfba0a34f198a3398e2dbfae4b4d8fff
+      NEXTAUTH_URL: https://builder.promolinxy.online
+      NEXT_PUBLIC_VIEWER_URL: https://bot.promolinxy.online
+      NEXTAUTH_SECRET: verysecretstringhere123
+    networks:
+      - stack-network
+    depends_on:
+      - postgres-typebot
+
+  ###################################################
+  # N8N
+  ###################################################
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=n8n.promolinxy.online
+      - N8N_PROTOCOL=https
+      - N8N_PORT=5678
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - N8N_SECURE_COOKIE=false
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=true
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
+    ports:
+      - "5678:5678"
+    volumes:
+      - ./n8n:/home/node/.n8n
+    networks:
+      - stack-network
+
+  ###################################################
+  # BACKEND SAAS (IMAGEM DO DOCKER HUB)
+  ###################################################
+  whatsapp-engine:
+    image: kauameloo/saas-backend:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://saasbot:saasbot123@postgres-saas:5432/saasbot?sslmode=disable
+      WHATSAPP_SESSION_PATH: /app/sessions
+      WHATSAPP_PORT: 3001
+      WHATSAPP_HOST: 0.0.0.0
+      WHATSAPP_ENGINE_URL: https://backend.promolinxy.online
+      QUEUE_STATS_PORT: 3002
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_ARGS: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage"
     ports:
       - "3001:3001"
       - "3002:3002"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      # Session storage path (volume mounted)
-      - WHATSAPP_SESSION_PATH=/app/sessions
-      - WHATSAPP_PORT=3001
-      - QUEUE_STATS_PORT=3002
-      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-      # Optional: Enable session data encryption
-      # - WHATSAPP_SESSION_ENCRYPTION_KEY=${WHATSAPP_SESSION_ENCRYPTION_KEY}
     volumes:
       - whatsapp-sessions:/app/sessions
     depends_on:
-      - postgres
+      - postgres-saas
       - redis
     networks:
-      - saasbot-network
+      - stack-network
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/health"]
       interval: 30s
@@ -62,69 +147,53 @@ services:
       retries: 3
       start_period: 40s
 
-  # ==========================================
-  # PostgreSQL Database
-  # ==========================================
-  postgres:
-    image: postgres:16-alpine
-    container_name: saasbot-postgres
+  ###################################################
+  # FRONTEND SAAS (Next.js)
+  ###################################################
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-saasbot}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-saasbot123}
-      - POSTGRES_DB=${POSTGRES_DB:-saasbot}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./scripts:/docker-entrypoint-initdb.d
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://backend.promolinxy.online
+      - DATABASE_URL=postgresql://saasbot:saasbot123@postgres-saas:5432/saasbot?sslmode=disable
+      - JWT_SECRET=${JWT_SECRET}
+      - CAKTO_WEBHOOK_SECRET=${CAKTO_WEBHOOK_SECRET}
+      - WHATSAPP_ENGINE_URL=http://whatsapp-engine:3001
+    depends_on:
+      - postgres-saas
+      - whatsapp-engine
     networks:
-      - saasbot-network
+      - stack-network
 
-  # ==========================================
-  # Nginx Reverse Proxy (opcional)
-  # ==========================================
-  nginx:
-    image: nginx:alpine
-    container_name: saasbot-nginx
+  ###################################################
+  # CADDY (PROXY)
+  ###################################################
+  caddy:
+    image: caddy:latest
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
     volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/ssl:/etc/nginx/ssl:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    networks:
+      - stack-network
     depends_on:
+      - typebot-builder
+      - typebot-viewer
       - frontend
       - whatsapp-engine
-    networks:
-      - saasbot-network
+      - n8n
 
-  # ==========================================
-  # Redis (para filas e cache)
-  # ==========================================
-  redis:
-    image: redis:7-alpine
-    container_name: saasbot-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - saasbot-network
-
-# ==========================================
-# Volumes
-# ==========================================
+##############################
+#          VOLUMES
+##############################
 volumes:
-  postgres-data:
-  whatsapp-sessions:
   redis-data:
-
-# ==========================================
-# Networks
-# ==========================================
-networks:
-  saasbot-network:
-    driver: bridge
+  whatsapp-sessions:
