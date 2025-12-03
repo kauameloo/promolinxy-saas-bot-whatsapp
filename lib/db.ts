@@ -18,8 +18,23 @@ function getSql(): NeonQueryFunction<false, false> {
   return _sql
 }
 
-// Export the getter function for direct SQL usage (tagged template literals)
-export { getSql as sql }
+// Export a proxy that allows both sql() calls and sql`...` tagged templates
+export const sql = new Proxy(getSql as any, {
+  get(target, prop) {
+    // For tagged template calls, we need to return a function that can act as a tagged template
+    const instance = target()
+    return instance[prop as keyof typeof instance]
+  },
+  apply(target, thisArg, args) {
+    // For sql`...` tagged template usage
+    if (args.length > 0 && Array.isArray(args[0]) && 'raw' in args[0]) {
+      const instance = target()
+      return instance.apply(thisArg, args)
+    }
+    // For sql() function call
+    return target.apply(thisArg, args)
+  }
+}) as NeonQueryFunction<false, false>
 
 // Helper for typed queries with parameterized statements
 export async function query<T>(queryText: string, params?: unknown[]): Promise<T[]> {
