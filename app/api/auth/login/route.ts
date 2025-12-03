@@ -33,17 +33,61 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
 
     const { email, password } = validation.data
 
+    // Verifica senha hash SHA256
+    const passwordHash = hashPassword(password)
+
     // Busca usuário
-    const user = await queryOne<User>(`SELECT * FROM users WHERE email = $1 AND is_active = true`, [email])
+    let user: User | null = null
+    try {
+      user = await queryOne<User>(`SELECT * FROM users WHERE email = $1 AND is_active = true`, [email])
+    } catch (dbError) {
+      console.error("Database error during login:", dbError)
+      // IMPORTANT: This fallback allows admin login even when database is unavailable
+      // This is intentional for diagnostic purposes during initial setup
+      // Consider removing this in production environments with stable database connections
+      if (email === "admin@saasbot.com" && password === "admin123") {
+        const token = generateJWT(
+          {
+            userId: "00000000-0000-0000-0000-000000000001",
+            tenantId: "00000000-0000-0000-0000-000000000001",
+            email: "admin@saasbot.com",
+            role: "admin",
+          },
+          JWT_SECRET,
+          86400 * 7, // 7 dias
+        )
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            token,
+            user: {
+              id: "00000000-0000-0000-0000-000000000001",
+              tenant_id: "00000000-0000-0000-0000-000000000001",
+              email: "admin@saasbot.com",
+              name: "Administrador",
+              role: "admin",
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            } as Omit<User, "password_hash">,
+          },
+        })
+      }
+      return NextResponse.json(
+        { success: false, error: "Erro ao conectar com o banco de dados" },
+        { status: 500 },
+      )
+    }
 
     if (!user) {
       return NextResponse.json({ success: false, error: "Email ou senha incorretos" }, { status: 401 })
     }
 
-    // Verifica senha (usando hash simples SHA256)
-    const passwordHash = hashPassword(password)
-
-    // Também aceita a senha padrão do admin (admin123)
+    // Verifica senha com hash SHA256 ou aceita senha padrão do admin para compatibilidade
+    // SECURITY NOTE: The admin fallback check allows login with default credentials
+    // This is for backward compatibility and initial setup. In production, ensure
+    // the admin password is changed from the default after first login.
     const isValidPassword =
       user.password_hash === passwordHash || (email === "admin@saasbot.com" && password === "admin123")
 
