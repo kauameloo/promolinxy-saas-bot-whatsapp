@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: typebot
-      POSTGRES_PASSWORD: typebotpass
+      POSTGRES_PASSWORD: ${TYPEBOT_POSTGRES_PASSWORD:-typebotpass}
       POSTGRES_DB: typebot
     volumes:
       - ./pgdata:/var/lib/postgresql/data
@@ -63,13 +63,13 @@ services:
     image: baptistearno/typebot-builder:latest
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://typebot:typebotpass@postgres-typebot:5432/typebot
-      ENCRYPTION_SECRET: bfba0a34f198a3398e2dbfae4b4d8fff
-      NEXTAUTH_URL: https://builder.promolinxy.online
-      NEXT_PUBLIC_VIEWER_URL: https://bot.promolinxy.online
-      NEXTAUTH_SECRET: verysecretstringhere123
-      GITHUB_CLIENT_ID: Ov23liZqwKvOK4MI2OiQ
-      GITHUB_CLIENT_SECRET: 5c936d4d3322391613246421cc6e00cd027ec3bf
+      DATABASE_URL: postgresql://typebot:${TYPEBOT_POSTGRES_PASSWORD:-typebotpass}@postgres-typebot:5432/typebot
+      ENCRYPTION_SECRET: ${TYPEBOT_ENCRYPTION_SECRET}
+      NEXTAUTH_URL: ${TYPEBOT_NEXTAUTH_URL:-https://builder.promolinxy.online}
+      NEXT_PUBLIC_VIEWER_URL: ${TYPEBOT_NEXT_PUBLIC_VIEWER_URL:-https://bot.promolinxy.online}
+      NEXTAUTH_SECRET: ${TYPEBOT_NEXTAUTH_SECRET}
+      GITHUB_CLIENT_ID: ${TYPEBOT_GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${TYPEBOT_GITHUB_CLIENT_SECRET:-}
     networks:
       - stack-network
     depends_on:
@@ -82,11 +82,11 @@ services:
     image: baptistearno/typebot-viewer:latest
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://typebot:typebotpass@postgres-typebot:5432/typebot
-      ENCRYPTION_SECRET: bfba0a34f198a3398e2dbfae4b4d8fff
-      NEXTAUTH_URL: https://builder.promolinxy.online
-      NEXT_PUBLIC_VIEWER_URL: https://bot.promolinxy.online
-      NEXTAUTH_SECRET: verysecretstringhere123
+      DATABASE_URL: postgresql://typebot:${TYPEBOT_POSTGRES_PASSWORD:-typebotpass}@postgres-typebot:5432/typebot
+      ENCRYPTION_SECRET: ${TYPEBOT_ENCRYPTION_SECRET}
+      NEXTAUTH_URL: ${TYPEBOT_NEXTAUTH_URL:-https://builder.promolinxy.online}
+      NEXT_PUBLIC_VIEWER_URL: ${TYPEBOT_NEXT_PUBLIC_VIEWER_URL:-https://bot.promolinxy.online}
+      NEXTAUTH_SECRET: ${TYPEBOT_NEXTAUTH_SECRET}
     networks:
       - stack-network
     depends_on:
@@ -122,7 +122,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://saasbot:saasbot123@postgres-saas:5432/saasbot?sslmode=disable
+      DATABASE_URL: postgresql://${POSTGRES_USER:-saasbot}:${POSTGRES_PASSWORD:-saasbot123}@postgres-saas:5432/${POSTGRES_DB:-saasbot}?sslmode=disable
       WHATSAPP_SESSION_PATH: /app/sessions
       WHATSAPP_PORT: 3001
       WHATSAPP_HOST: 0.0.0.0
@@ -158,7 +158,7 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=https://backend.promolinxy.online
-      - DATABASE_URL=postgresql://saasbot:saasbot123@postgres-saas:5432/saasbot?sslmode=disable
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-saasbot}:${POSTGRES_PASSWORD:-saasbot123}@postgres-saas:5432/${POSTGRES_DB:-saasbot}?sslmode=disable
       - JWT_SECRET=${JWT_SECRET}
       - CAKTO_WEBHOOK_SECRET=${CAKTO_WEBHOOK_SECRET}
       - WHATSAPP_ENGINE_URL=http://whatsapp-engine:3001

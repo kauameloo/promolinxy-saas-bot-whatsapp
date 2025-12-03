@@ -30,8 +30,10 @@ help:
 	@echo ""
 
 # Initial setup (run once)
+# NOTE: This requires root privileges to install Docker and configure the system
 setup:
 	@echo "Running initial VPS setup..."
+	@echo "⚠️  This command requires root privileges"
 	@chmod +x deploy/setup-vps.sh
 	@sudo deploy/setup-vps.sh
 
