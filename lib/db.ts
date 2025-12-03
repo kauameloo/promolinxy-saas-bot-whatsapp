@@ -19,9 +19,9 @@ function getSql(): NeonQueryFunction<false, false> {
 }
 
 // Export a proxy that allows both sql() calls and sql`...` tagged templates
-export const sql = new Proxy(getSql as any, {
+export const sql = new Proxy(getSql, {
   get(target, prop) {
-    // For tagged template calls, we need to return a function that can act as a tagged template
+    // Handle property access on the Neon instance
     const instance = target()
     return instance[prop as keyof typeof instance]
   },
@@ -34,7 +34,7 @@ export const sql = new Proxy(getSql as any, {
     // For sql() function call
     return target.apply(thisArg, args)
   }
-}) as NeonQueryFunction<false, false>
+}) as unknown as NeonQueryFunction<false, false>
 
 // Helper for typed queries with parameterized statements
 export async function query<T>(queryText: string, params?: unknown[]): Promise<T[]> {
