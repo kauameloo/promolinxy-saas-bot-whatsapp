@@ -41,6 +41,11 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
     })
   } catch (error) {
     console.error("Auth me error:", error)
-    return NextResponse.json({ success: false, error: "Erro interno do servidor" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Erro interno do servidor"
+    return NextResponse.json({ 
+      success: false, 
+      error: errorMessage,
+      details: process.env.NODE_ENV === "development" ? String(error) : undefined
+    }, { status: 500 })
   }
 }

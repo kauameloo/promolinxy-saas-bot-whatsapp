@@ -33,6 +33,11 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
     })
   } catch (error) {
     console.error("Dashboard stats error:", error)
-    return NextResponse.json({ success: false, error: "Erro ao buscar estatísticas" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Erro ao buscar estatísticas"
+    return NextResponse.json({ 
+      success: false, 
+      error: errorMessage,
+      details: process.env.NODE_ENV === "development" ? String(error) : undefined
+    }, { status: 500 })
   }
 }
