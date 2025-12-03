@@ -21,7 +21,7 @@ function getSql(): NeonQueryFunction<false, false> {
 // Export the getter function for direct SQL usage (tagged template literals)
 export { getSql as sql }
 
-// Helper para queries tipadas - uses parameterized queries
+// Helper for typed queries with parameterized statements
 export async function query<T>(queryText: string, params?: unknown[]): Promise<T[]> {
   try {
     const sqlInstance = getSql()
@@ -31,7 +31,10 @@ export async function query<T>(queryText: string, params?: unknown[]): Promise<T
   } catch (error) {
     console.error("Database query error:", error)
     console.error("Query:", queryText)
-    console.error("Params:", params)
+    // Only log params in development to avoid exposing sensitive data
+    if (process.env.NODE_ENV === "development") {
+      console.error("Params:", params)
+    }
     throw error
   }
 }

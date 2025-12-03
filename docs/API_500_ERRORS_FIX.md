@@ -177,15 +177,19 @@ curl -H "Authorization: Bearer YOUR_TOKEN" $BASE_URL/api/auth/me
 - Ensure your `DATABASE_URL` environment variable is correctly set and accessible from the Docker container
 - The connection string should be in the format: `postgresql://user:password@host:port/database?sslmode=require`
 - For Neon PostgreSQL, make sure to include `?sslmode=require` at the end
+- **Security Warning**: Never log or expose database connection strings with credentials. Always use environment variables and secure secrets management.
 
 ### Environment Variables Priority
 - `NEXT_PUBLIC_API_URL` is embedded at build time and cannot be changed at runtime
 - If you need to change this URL, you must rebuild the frontend container/application
+- Store sensitive environment variables (JWT_SECRET, DATABASE_URL) securely and never commit them to version control
 
 ### Security Considerations
 - The enhanced error logging includes detailed error information in development mode only
+- Query parameters are only logged in development to prevent exposure of sensitive data
 - In production (`NODE_ENV=production`), only user-friendly error messages are returned
-- Always use strong values for `JWT_SECRET` in production
+- Always use strong values for `JWT_SECRET` in production (minimum 64 characters)
+- Never expose database credentials in logs, error messages, or configuration files
 
 ## Troubleshooting
 
