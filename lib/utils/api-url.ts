@@ -14,8 +14,8 @@ export function getApiBaseUrl(): string {
     // Client-side: use environment variable or current origin
     return process.env.NEXT_PUBLIC_API_URL || window.location.origin
   }
-  // Server-side: use environment variable or empty string (will be relative)
-  return process.env.NEXT_PUBLIC_API_URL || ""
+  // Server-side: use environment variable or fallback to localhost for development
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
 }
 
 /**
@@ -26,11 +26,6 @@ export function getApiBaseUrl(): string {
 export function getApiUrl(path: string): string {
   const baseUrl = getApiBaseUrl()
   const normalizedPath = path.startsWith("/") ? path : `/${path}`
-  
-  // If baseUrl is empty (server-side without env var), return just the path
-  if (!baseUrl) {
-    return normalizedPath
-  }
   
   return `${baseUrl}${normalizedPath}`
 }
