@@ -111,7 +111,7 @@ export default function LoginPage() {
 
           {/* Demo credentials */}
           <div className="rounded-lg border border-border bg-muted/50 p-4 text-center text-sm">
-            <p className="font-medium">Credenciais de demonstração:</p>
+            <p className="font-medium">DEV Credenciais de demonstração:</p>
             <p className="mt-1 text-muted-foreground">Email: admin@saasbot.com</p>
             <p className="text-muted-foreground">Senha: admin123</p>
           </div>
