@@ -92,6 +92,8 @@ npm run dev
    - 📧 **Email:** `admin@saasbot.com`
    - 🔑 **Senha:** `admin123`
 
+> **💡 Nota:** O login do admin funciona mesmo se o banco de dados não estiver configurado inicialmente, permitindo que você acesse o dashboard para diagnóstico. No entanto, para funcionalidade completa, configure o banco de dados conforme o passo 4.
+
 ### ✅ Pronto! O projeto está rodando!
 
 Agora você pode:
@@ -1194,6 +1196,32 @@ docker cp saasbot-whatsapp:/app/sessions ./sessions_backup
 ---
 
 ## ❓ Troubleshooting
+
+### Problema: "Erro interno do servidor" ao fazer login
+
+**Causa:** Incompatibilidade de hash de senha entre banco de dados e aplicação.
+
+**Solução:**
+
+Se você recebeu um erro 500 ao tentar fazer login com as credenciais padrão (`admin@saasbot.com` / `admin123`), execute esta correção:
+
+```bash
+# Se usando Neon Database:
+# 1. Vá ao SQL Editor no dashboard do Neon
+# 2. Execute o seguinte SQL:
+UPDATE users 
+SET password_hash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'
+WHERE email = 'admin@saasbot.com';
+
+# Ou use o script de migração fornecido:
+# No SQL Editor do Neon, cole e execute o conteúdo do arquivo:
+# scripts/002-fix-admin-password-hash.sql
+
+# Se usando PostgreSQL local:
+psql -U saasbot -d saasbot -f scripts/002-fix-admin-password-hash.sql
+```
+
+**Nota:** Esta correção atualiza o hash da senha do admin de bcrypt para SHA256, que é o formato usado pela aplicação.
 
 ### Problema: "DATABASE_URL not set"
 

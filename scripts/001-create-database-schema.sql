@@ -304,12 +304,12 @@ INSERT INTO tenants (id, name, slug, plan, status)
 VALUES ('00000000-0000-0000-0000-000000000001', 'Default Tenant', 'default', 'pro', 'active')
 ON CONFLICT (slug) DO NOTHING;
 
--- Criar usuário admin padrão (senha: admin123 - hash bcrypt)
+-- Criar usuário admin padrão (senha: admin123 - hash SHA256)
 INSERT INTO users (tenant_id, email, password_hash, name, role) 
 VALUES (
     '00000000-0000-0000-0000-000000000001',
     'admin@saasbot.com',
-    '$2b$10$K7L1OJ45/4Y2nIvhRVpCe.FSmhDdWoXehVzJptJ/op0lSsvqNu/1u',
+    '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
     'Administrador',
     'admin'
 )
