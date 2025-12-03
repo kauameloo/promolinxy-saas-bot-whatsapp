@@ -7,6 +7,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { User } from "@/lib/types"
+import { getApiUrl } from "@/lib/utils/api-url"
 
 interface AuthState {
   user: Omit<User, "password_hash"> | null
@@ -25,7 +26,7 @@ export const useAuth = create<AuthState>()(
       isLoading: true,
 
       login: async (email: string, password: string) => {
-        const response = await fetch("/api/auth/login", {
+        const response = await fetch(getApiUrl("/api/auth/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
@@ -57,7 +58,7 @@ export const useAuth = create<AuthState>()(
         }
 
         try {
-          const response = await fetch("/api/auth/me", {
+          const response = await fetch(getApiUrl("/api/auth/me"), {
             headers: { Authorization: `Bearer ${token}` },
           })
 
