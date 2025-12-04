@@ -621,9 +621,15 @@ export class WhatsAppEngine {
       return phoneNumber
     }
 
+    // Guard: Ensure client is available
+    if (!this.client) {
+      console.warn(`[WhatsApp Engine] Client not available for LID lookup, using fallback format`)
+      return `${phoneNumber}@c.us`
+    }
+
     try {
       // Try to get LID for the user
-      const lidInfo = await this.client!.getContactLidAndPhone([phoneNumber])
+      const lidInfo = await this.client.getContactLidAndPhone([phoneNumber])
       
       if (lidInfo && lidInfo.length > 0 && lidInfo[0].lid) {
         console.log(`[WhatsApp Engine] Using LID format for ${phoneNumber}: ${lidInfo[0].lid}`)
