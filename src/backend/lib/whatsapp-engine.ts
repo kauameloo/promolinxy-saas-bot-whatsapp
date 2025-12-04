@@ -614,6 +614,9 @@ export class WhatsAppEngine {
   /**
    * Resolves the correct chat ID format (LID or c.us) for a phone number
    * WhatsApp now requires @lid format for some phone numbers
+   * 
+   * Note: This method should only be called when the client is connected,
+   * as it relies on the WhatsApp Web API to retrieve LID information.
    */
   private async resolveChatId(phoneNumber: string): Promise<string> {
     // If already formatted with suffix, return as-is
@@ -628,12 +631,18 @@ export class WhatsAppEngine {
     }
 
     try {
-      // Try to get LID for the user
+      // Try to get LID and phone info for the user
       const lidInfo = await this.client.getContactLidAndPhone([phoneNumber])
       
       if (lidInfo && lidInfo.length > 0 && lidInfo[0].lid) {
-        console.log(`[WhatsApp Engine] Using LID format for ${phoneNumber}: ${lidInfo[0].lid}`)
-        return lidInfo[0].lid
+        const lid = lidInfo[0].lid
+        // Basic validation: LID should contain @ symbol
+        if (lid.includes("@")) {
+          console.log(`[WhatsApp Engine] Using LID format for ${phoneNumber}: ${lid}`)
+          return lid
+        } else {
+          console.warn(`[WhatsApp Engine] Invalid LID format received: ${lid}, using fallback`)
+        }
       }
     } catch (error) {
       // If LID lookup fails, log but continue with fallback
