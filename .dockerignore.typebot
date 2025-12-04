@@ -1,0 +1,53 @@
+# Node modules should not be sent to the daemon
+node_modules
+.next
+build
+pnpm-lock.yaml
+npm-debug.log
+yarn.lock
+pnpm-store
+
+# Git
+.git
+
+# Local env
+.env
+.env.local
+.env.development.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Editor
+.vscode
+.idea
+
+# Source files (we only need dist)
+src
+typeninja-base
+app
+components
+public
+styles
+docs
+scripts
+
+# Config files not needed
+.eslintrc*
+.gitignore
+.prettierrc*
+next.config.mjs
+tailwind.config.*
+postcss.config.*
+tsconfig.json
+tsconfig.backend.json
+README.md
+SETUP.md
+
+# Other Dockerfiles
+Dockerfile.backend
+Dockerfile.frontend

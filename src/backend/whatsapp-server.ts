@@ -8,6 +8,8 @@ import { query, queryOne, update, dbPool, closePool } from "./lib/db"
 import type { WhatsAppSession, Tenant } from "./lib/types"
 import express, { Application, Request, Response, NextFunction } from "express"
 import cors from "cors"
+import { handleTypeBotMessage, initializeTypeBotBridge, removeTypeBotBridge } from "./lib/typebot-service"
+import { sendTypeBotMessages } from "./lib/typebot-sender"
 
 const app: Application = express()
 const PORT = process.env.WHATSAPP_PORT || 3001
@@ -139,10 +141,24 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
 
         // Stop message queue
         stopMessageQueue(tenantId)
+        
+        // Remove TypeBot bridge
+        removeTypeBotBridge(tenantId)
       },
       onMessage: async (message) => {
         console.log(`[WhatsApp ${tenantId}] Incoming message from ${message.from}: ${message.body}`)
-        // Handle incoming messages - could trigger flows, etc.
+        
+        // Try TypeBot bridge integration
+        try {
+          const outbound = await handleTypeBotMessage(tenantId, message.from, message.body, "text")
+          if (outbound && outbound.messages.length > 0) {
+            // Send TypeBot response back to WhatsApp
+            await sendTypeBotMessages(engine, outbound.to, outbound.messages, outbound.delay)
+            console.log(`[WhatsApp ${tenantId}] Sent ${outbound.messages.length} TypeBot responses`)
+          }
+        } catch (error) {
+          console.error(`[WhatsApp ${tenantId}] TypeBot error:`, error)
+        }
       },
     })
 
@@ -249,6 +265,232 @@ app.get("/api/whatsapp/sessions", (_req: Request, res: Response) => {
   const sessions = whatsappManager.getAllSessions()
   return res.json({ success: true, data: sessions })
 })
+
+// =====================================================
+// TYPEBOT BRIDGE API ROUTES
+// =====================================================
+
+// Get TypeBot flows for a tenant
+app.get("/api/typebot/flows/:tenantId", async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params
+
+    const flows = await query(
+      `SELECT id, tenant_id, name, flow_url, is_active, settings, created_at, updated_at
+       FROM typebot_flows 
+       WHERE tenant_id = $1 
+       ORDER BY created_at DESC`,
+      [tenantId]
+    )
+
+    return res.json({ success: true, data: flows })
+  } catch (error) {
+    console.error("Get TypeBot flows error:", error)
+    return res.status(500).json({ success: false, error: "Error fetching flows" })
+  }
+})
+
+// Create TypeBot flow
+app.post("/api/typebot/flows/:tenantId", async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params
+    const { name, flowUrl, token, settings } = req.body
+
+    if (!name || !flowUrl) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: name, flowUrl",
+      })
+    }
+
+    const result = await query(
+      `INSERT INTO typebot_flows (tenant_id, name, flow_url, token, settings, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
+       RETURNING *`,
+      [tenantId, name, flowUrl, token || null, JSON.stringify(settings || {})]
+    )
+
+    // Initialize bridge for this tenant
+    await initializeTypeBotBridge(tenantId)
+
+    return res.json({ success: true, data: result[0] })
+  } catch (error) {
+    console.error("Create TypeBot flow error:", error)
+    return res.status(500).json({ success: false, error: "Error creating flow" })
+  }
+})
+
+// Update TypeBot flow
+app.put("/api/typebot/flows/:tenantId/:flowId", async (req: Request, res: Response) => {
+  try {
+    const { tenantId, flowId } = req.params
+    const { name, flowUrl, token, settings, isActive } = req.body
+
+    const updates: string[] = []
+    const values: unknown[] = []
+    let paramIndex = 1
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex++}`)
+      values.push(name)
+    }
+    if (flowUrl !== undefined) {
+      updates.push(`flow_url = $${paramIndex++}`)
+      values.push(flowUrl)
+    }
+    if (token !== undefined) {
+      updates.push(`token = $${paramIndex++}`)
+      values.push(token)
+    }
+    if (settings !== undefined) {
+      updates.push(`settings = $${paramIndex++}`)
+      values.push(JSON.stringify(settings))
+    }
+    if (isActive !== undefined) {
+      updates.push(`is_active = $${paramIndex++}`)
+      values.push(isActive)
+    }
+
+    updates.push(`updated_at = NOW()`)
+
+    values.push(flowId)
+    values.push(tenantId)
+
+    const result = await query(
+      `UPDATE typebot_flows 
+       SET ${updates.join(", ")}
+       WHERE id = $${paramIndex++} AND tenant_id = $${paramIndex++}
+       RETURNING *`,
+      values
+    )
+
+    if (result.length === 0) {
+      return res.status(404).json({ success: false, error: "Flow not found" })
+    }
+
+    // Reinitialize bridge with new config
+    await initializeTypeBotBridge(tenantId)
+
+    return res.json({ success: true, data: result[0] })
+  } catch (error) {
+    console.error("Update TypeBot flow error:", error)
+    return res.status(500).json({ success: false, error: "Error updating flow" })
+  }
+})
+
+// Delete TypeBot flow
+app.delete("/api/typebot/flows/:tenantId/:flowId", async (req: Request, res: Response) => {
+  try {
+    const { tenantId, flowId } = req.params
+
+    await query(
+      `DELETE FROM typebot_flows WHERE id = $1 AND tenant_id = $2`,
+      [flowId, tenantId]
+    )
+
+    // Remove bridge if no more active flows
+    const remainingFlows = await query(
+      `SELECT id FROM typebot_flows WHERE tenant_id = $1 AND is_active = true LIMIT 1`,
+      [tenantId]
+    )
+
+    if (remainingFlows.length === 0) {
+      removeTypeBotBridge(tenantId)
+    }
+
+    return res.json({ success: true, message: "Flow deleted" })
+  } catch (error) {
+    console.error("Delete TypeBot flow error:", error)
+    return res.status(500).json({ success: false, error: "Error deleting flow" })
+  }
+})
+
+// Get TypeBot logs for a tenant
+app.get("/api/typebot/logs/:tenantId", async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params
+    const { phone, sessionId, limit = "100" } = req.query
+
+    let queryStr = `
+      SELECT id, phone, session_id, direction, content, message_type, error_message, created_at
+      FROM typebot_logs 
+      WHERE tenant_id = $1
+    `
+    const params: unknown[] = [tenantId]
+    let paramIndex = 2
+
+    if (phone) {
+      queryStr += ` AND phone = $${paramIndex++}`
+      params.push(phone)
+    }
+
+    if (sessionId) {
+      queryStr += ` AND session_id = $${paramIndex++}`
+      params.push(sessionId)
+    }
+
+    queryStr += ` ORDER BY created_at DESC LIMIT $${paramIndex++}`
+    params.push(parseInt(limit as string, 10))
+
+    const logs = await query(queryStr, params)
+
+    // Mask phone numbers in response
+    const maskedLogs = logs.map((log: any) => ({
+      ...log,
+      phone: maskPhone(log.phone),
+    }))
+
+    return res.json({ success: true, data: maskedLogs })
+  } catch (error) {
+    console.error("Get TypeBot logs error:", error)
+    return res.status(500).json({ success: false, error: "Error fetching logs" })
+  }
+})
+
+// Test TypeBot flow
+app.post("/api/typebot/test/:tenantId", async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params
+    const { phone, message } = req.body
+
+    if (!phone || !message) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: phone, message",
+      })
+    }
+
+    const outbound = await handleTypeBotMessage(tenantId, phone, message, "text")
+
+    if (!outbound) {
+      return res.status(400).json({
+        success: false,
+        error: "No TypeBot flow configured for this tenant",
+      })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        messageCount: outbound.messages.length,
+        messages: outbound.messages,
+        delay: outbound.delay,
+      },
+    })
+  } catch (error) {
+    console.error("Test TypeBot flow error:", error)
+    return res.status(500).json({ success: false, error: "Error testing flow" })
+  }
+})
+
+// Helper function to mask phone numbers
+function maskPhone(phone: string): string {
+  if (!phone || phone.length < 8) return phone
+  const visible = phone.slice(0, -7)
+  const masked = "*".repeat(Math.min(3, phone.length - 7))
+  const lastDigits = phone.slice(-4)
+  return `${visible}${masked}${lastDigits}`
+}
 
 // Get list of persisted sessions (sessions that have saved data)
 app.get("/api/whatsapp/persisted-sessions", (_req: Request, res: Response) => {
@@ -445,6 +687,10 @@ async function initializeActiveConnections(): Promise<void> {
               updated_at: new Date().toISOString(),
             })
             console.log(`[Server] Session ${session.tenant_id} restored successfully`)
+            
+            // Initialize TypeBot bridge for this tenant
+            await initializeTypeBotBridge(session.tenant_id)
+            
             // Option A: Disable internal MessageQueue; rely on standalone queue-worker
             console.log(`[Server] Internal MessageQueue disabled for tenant ${session.tenant_id}.`)
           },

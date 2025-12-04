@@ -1,0 +1,51 @@
+# =====================================================
+# DOCKERFILE - TypeBot Bridge Service
+# Standalone microservice for bidirectional WhatsApp <-> TypeBot
+# 
+# PREREQUISITES: 
+# 1. Build TypeScript code locally: npm run build:backend
+# 2. This creates the 'dist' directory which is copied into the image
+# =====================================================
+
+FROM node:20-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    ca-certificates \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Skip puppeteer download (not needed for typebot-bridge)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+
+# Install only production dependencies
+RUN npm install --production --legacy-peer-deps --no-optional || \
+    npm install --production --legacy-peer-deps || \
+    npm install --production
+
+# Copy PM2 config
+COPY ecosystem.typebot-bridge.config.js ./
+
+# Copy pre-built dist directory
+# NOTE: Must run 'npm run build:backend' locally before building this image
+COPY dist ./dist
+
+# Create directories for config and media
+RUN mkdir -p /app/config /tmp/typebot-media /app/logs
+
+# Expose port for the API server
+EXPOSE 3010
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -fsS http://localhost:3010/health || exit 1
+
+# Default command - runs both server and worker via PM2
+CMD ["npx", "pm2-runtime", "start", "ecosystem.typebot-bridge.config.js"]
