@@ -1,0 +1,69 @@
+# =====================================================
+# DOCKERFILE - TypeBot Bridge Service
+# Standalone microservice for bidirectional WhatsApp <-> TypeBot
+# =====================================================
+
+FROM node:20-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    ca-certificates \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy dependency files
+COPY package*.json pnpm-lock.yaml* yarn.lock* ./
+
+# Install dependencies (supports npm, yarn, and pnpm)
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm install --frozen-lockfile; \
+  elif [ -f yarn.lock ]; then \
+    yarn --frozen-lockfile; \
+  else \
+    npm ci; \
+  fi
+
+# Copy source code
+COPY . .
+
+# Copy TypeScript configuration for backend
+COPY tsconfig.backend.json ./
+
+# Build the backend TypeScript code
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm run build:backend; \
+  elif [ -f yarn.lock ]; then \
+    yarn build:backend; \
+  else \
+    npm run build:backend; \
+  fi
+
+# Create directories for config and media
+RUN mkdir -p /app/config /tmp/typebot-media /app/logs
+
+# Remove dev dependencies after build to keep image lean
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    pnpm prune --prod || true; \
+  elif [ -f yarn.lock ]; then \
+    yarn install --production --frozen-lockfile || true; \
+  else \
+    npm prune --production || true; \
+  fi
+
+# Expose port for the API server
+EXPOSE 3010
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -fsS http://localhost:3010/health || exit 1
+
+# Default command - runs both server and worker via PM2
+# Can be overridden in docker-compose to run only server or worker
+CMD ["npx", "pm2-runtime", "start", "ecosystem.typebot-bridge.config.js"]
