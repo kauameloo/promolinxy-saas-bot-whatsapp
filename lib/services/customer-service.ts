@@ -15,7 +15,7 @@ export class CustomerService {
   /**
    * Busca ou cria um cliente baseado no webhook da Cakto
    */
-  async findOrCreateFromWebhook(payload: CaktoWebhookPayload): Promise<Customer> {
+  async findOrCreateFromWebhook(payload: CaktoWebhookPayload, isDebugMode = false): Promise<Customer> {
     const customerData = payload.customer
     if (!customerData?.phone) {
       throw new Error("Customer phone is required")
@@ -23,6 +23,9 @@ export class CustomerService {
 
     // Normaliza o telefone
     const phone = customerData.phone.replace(/\D/g, "")
+    if (isDebugMode) {
+      console.log(`Looking up customer by phone: ${phone}`)
+    }
 
     // Tenta encontrar pelo telefone
     let customer = await queryOne<Customer>(`SELECT * FROM customers WHERE tenant_id = $1 AND phone = $2`, [
@@ -31,19 +34,35 @@ export class CustomerService {
     ])
 
     if (customer) {
-      // Atualiza dados se necessário
-      if (customerData.name !== customer.name || customerData.email !== customer.email) {
-        customer = await update<Customer>("customers", customer.id, {
-          name: customerData.name || customer.name,
-          email: customerData.email || customer.email,
-          document: customerData.document || customer.document,
-        })
+      if (isDebugMode) {
+        console.log(`Customer found: ${customer.name} (${customer.id})`)
+      }
+      
+      // Atualiza dados se necessário (mantém dados mais completos)
+      // Só atualiza se o novo valor é válido (não vazio) E diferente do atual
+      const shouldUpdateName = customerData.name && customerData.name.trim() !== "" && customerData.name !== customer.name
+      const shouldUpdateEmail = customerData.email && customerData.email.trim() !== "" && customerData.email !== customer.email
+      const shouldUpdateDocument = customerData.document && customerData.document.trim() !== "" && customerData.document !== customer.document
+
+      if (shouldUpdateName || shouldUpdateEmail || shouldUpdateDocument) {
+        const updateData: Record<string, string> = {}
+        if (shouldUpdateName) updateData.name = customerData.name
+        if (shouldUpdateEmail) updateData.email = customerData.email
+        if (shouldUpdateDocument) updateData.document = customerData.document
+        
+        if (isDebugMode) {
+          console.log("Updating customer with new data:", updateData)
+        }
+        customer = await update<Customer>("customers", customer.id, updateData)
+        if (isDebugMode) {
+          console.log("✓ Customer updated successfully")
+        }
       }
       return customer!
     }
 
     // Cria novo cliente
-    customer = await insert<Customer>("customers", {
+    const newCustomerData = {
       tenant_id: this.tenantId,
       name: customerData.name || "Cliente",
       email: customerData.email,
@@ -51,7 +70,15 @@ export class CustomerService {
       document: customerData.document,
       metadata: {},
       tags: JSON.stringify([]),
-    })
+    }
+    
+    if (isDebugMode) {
+      console.log("Creating new customer:", newCustomerData)
+    }
+    customer = await insert<Customer>("customers", newCustomerData)
+    if (isDebugMode) {
+      console.log(`✓ New customer created: ${customer.name} (${customer.id})`)
+    }
 
     return customer
   }

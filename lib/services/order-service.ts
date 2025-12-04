@@ -4,6 +4,7 @@
 
 import { query, queryOne, insert, update } from "@/lib/db"
 import type { Order, CaktoWebhookPayload, OrderStatus } from "@/lib/types"
+import { getPixCode } from "@/lib/utils/message-parser"
 
 export class OrderService {
   private tenantId: string
@@ -15,22 +16,25 @@ export class OrderService {
   /**
    * Cria ou atualiza pedido baseado no webhook
    */
-  async createFromWebhook(payload: CaktoWebhookPayload, customerId: string | null): Promise<Order> {
+  async createFromWebhook(payload: CaktoWebhookPayload, customerId: string | null, isDebugMode = false): Promise<Order> {
     const externalId = payload.transaction_id
 
     // Se já existe, atualiza
     if (externalId) {
       const existing = await this.findByExternalId(externalId)
       if (existing) {
-        return this.updateFromWebhook(existing.id, payload)
+        if (isDebugMode) {
+          console.log(`Order found by transaction_id ${externalId}, updating...`)
+        }
+        return this.updateFromWebhook(existing.id, payload, isDebugMode)
       }
     }
 
     // Determina o status baseado no evento
     const status = this.getStatusFromEvent(payload.event)
 
-    // Cria novo pedido
-    const order = await insert<Order>("orders", {
+    // Cria novo pedido com todos os dados disponíveis
+    const orderData = {
       tenant_id: this.tenantId,
       customer_id: customerId,
       external_id: externalId,
@@ -40,11 +44,26 @@ export class OrderService {
       status,
       payment_method: payload.payment?.method,
       payment_url: payload.payment?.checkout_url,
-      pix_code: payload.payment?.pix_code,
+      pix_code: getPixCode(payload.payment),
       boleto_url: payload.payment?.boleto_url,
       checkout_url: payload.payment?.checkout_url,
-      metadata: JSON.stringify(payload.metadata || {}),
-    })
+      metadata: JSON.stringify({
+        ...(payload.metadata || {}),
+        payment_status: payload.payment?.status,
+        event_type: payload.event,
+        timestamp: payload.timestamp,
+      }),
+    }
+
+    if (isDebugMode) {
+      const { metadata, ...logData } = orderData
+      console.log("Creating new order:", logData)
+    }
+    
+    const order = await insert<Order>("orders", orderData)
+    if (isDebugMode) {
+      console.log(`✓ New order created: ${order.id}`)
+    }
 
     return order
   }
@@ -52,16 +71,33 @@ export class OrderService {
   /**
    * Atualiza pedido existente
    */
-  async updateFromWebhook(id: string, payload: CaktoWebhookPayload): Promise<Order> {
+  async updateFromWebhook(id: string, payload: CaktoWebhookPayload, isDebugMode = false): Promise<Order> {
     const status = this.getStatusFromEvent(payload.event)
 
-    const updated = await update<Order>("orders", id, {
+    const updateData = {
       status,
       payment_method: payload.payment?.method,
-      pix_code: payload.payment?.pix_code,
+      pix_code: getPixCode(payload.payment),
       boleto_url: payload.payment?.boleto_url,
-      metadata: JSON.stringify(payload.metadata || {}),
-    })
+      payment_url: payload.payment?.checkout_url,
+      checkout_url: payload.payment?.checkout_url,
+      metadata: JSON.stringify({
+        ...(payload.metadata || {}),
+        payment_status: payload.payment?.status,
+        event_type: payload.event,
+        timestamp: payload.timestamp,
+      }),
+    }
+
+    if (isDebugMode) {
+      const { metadata, ...logData } = updateData
+      console.log(`Updating order ${id} with:`, logData)
+    }
+
+    const updated = await update<Order>("orders", id, updateData)
+    if (isDebugMode) {
+      console.log("✓ Order updated successfully")
+    }
 
     return updated!
   }

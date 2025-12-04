@@ -16,7 +16,7 @@ export class MessageService {
   /**
    * Agenda mensagens de um fluxo para um cliente
    */
-  async scheduleFlowMessages(flow: MessageFlow, customer: Customer, order: Order): Promise<ScheduledMessage[]> {
+  async scheduleFlowMessages(flow: MessageFlow, customer: Customer, order: Order, isDebugMode = false): Promise<ScheduledMessage[]> {
     if (!flow.messages || flow.messages.length === 0) {
       return []
     }
@@ -35,6 +35,19 @@ export class MessageService {
       qr_code: order.pix_code || "",
       link_checkout: order.checkout_url || order.payment_url || "",
       link_pix: order.pix_code || "",
+    }
+
+    if (isDebugMode) {
+      console.log("Message variables for flow:", {
+        nome: variables.nome,
+        email: variables.email || "(empty)",
+        telefone: variables.telefone,
+        produto: variables.produto || "(empty)",
+        preco: variables.preco || "(empty)",
+        hasLinkBoleto: !!variables.link_boleto,
+        hasQrCode: !!variables.qr_code,
+        hasLinkCheckout: !!variables.link_checkout,
+      })
     }
 
     for (const message of flow.messages) {
@@ -63,6 +76,9 @@ export class MessageService {
         attempts: 0,
       })
 
+      if (isDebugMode) {
+        console.log(`  → Message scheduled for ${scheduledFor.toISOString()} (delay: ${cumulativeDelay}min)`)
+      }
       scheduledMessages.push(scheduled)
     }
 

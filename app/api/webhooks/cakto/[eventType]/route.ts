@@ -109,6 +109,12 @@ export async function POST(
       event: eventType as CaktoEventType,
     }
 
+    console.log(`Processing webhook for event: ${eventType}`)
+    console.log(`Tenant ID: ${tenantId}`)
+    console.log(`Has customer data: ${!!fullPayload.customer}`)
+    console.log(`Has product data: ${!!fullPayload.product}`)
+    console.log(`Has payment data: ${!!fullPayload.payment}`)
+
     // Processa o webhook
     const webhookService = new WebhookService(tenantId)
     const event = await webhookService.processWebhook(fullPayload)
