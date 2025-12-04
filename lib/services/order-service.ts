@@ -16,15 +16,17 @@ export class OrderService {
   /**
    * Cria ou atualiza pedido baseado no webhook
    */
-  async createFromWebhook(payload: CaktoWebhookPayload, customerId: string | null): Promise<Order> {
+  async createFromWebhook(payload: CaktoWebhookPayload, customerId: string | null, isDebugMode = false): Promise<Order> {
     const externalId = payload.transaction_id
 
     // Se já existe, atualiza
     if (externalId) {
       const existing = await this.findByExternalId(externalId)
       if (existing) {
-        console.log(`Order found by transaction_id ${externalId}, updating...`)
-        return this.updateFromWebhook(existing.id, payload)
+        if (isDebugMode) {
+          console.log(`Order found by transaction_id ${externalId}, updating...`)
+        }
+        return this.updateFromWebhook(existing.id, payload, isDebugMode)
       }
     }
 
@@ -53,11 +55,15 @@ export class OrderService {
       }),
     }
 
-    const { metadata, ...logData } = orderData
-    console.log("Creating new order:", logData)
+    if (isDebugMode) {
+      const { metadata, ...logData } = orderData
+      console.log("Creating new order:", logData)
+    }
     
     const order = await insert<Order>("orders", orderData)
-    console.log(`✓ New order created: ${order.id}`)
+    if (isDebugMode) {
+      console.log(`✓ New order created: ${order.id}`)
+    }
 
     return order
   }
@@ -65,7 +71,7 @@ export class OrderService {
   /**
    * Atualiza pedido existente
    */
-  async updateFromWebhook(id: string, payload: CaktoWebhookPayload): Promise<Order> {
+  async updateFromWebhook(id: string, payload: CaktoWebhookPayload, isDebugMode = false): Promise<Order> {
     const status = this.getStatusFromEvent(payload.event)
 
     const updateData = {
@@ -83,11 +89,15 @@ export class OrderService {
       }),
     }
 
-    const { metadata, ...logData } = updateData
-    console.log(`Updating order ${id} with:`, logData)
+    if (isDebugMode) {
+      const { metadata, ...logData } = updateData
+      console.log(`Updating order ${id} with:`, logData)
+    }
 
     const updated = await update<Order>("orders", id, updateData)
-    console.log("✓ Order updated successfully")
+    if (isDebugMode) {
+      console.log("✓ Order updated successfully")
+    }
 
     return updated!
   }

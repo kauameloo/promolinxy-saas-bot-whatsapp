@@ -15,7 +15,7 @@ export class CustomerService {
   /**
    * Busca ou cria um cliente baseado no webhook da Cakto
    */
-  async findOrCreateFromWebhook(payload: CaktoWebhookPayload): Promise<Customer> {
+  async findOrCreateFromWebhook(payload: CaktoWebhookPayload, isDebugMode = false): Promise<Customer> {
     const customerData = payload.customer
     if (!customerData?.phone) {
       throw new Error("Customer phone is required")
@@ -23,7 +23,9 @@ export class CustomerService {
 
     // Normaliza o telefone
     const phone = customerData.phone.replace(/\D/g, "")
-    console.log(`Looking up customer by phone: ${phone}`)
+    if (isDebugMode) {
+      console.log(`Looking up customer by phone: ${phone}`)
+    }
 
     // Tenta encontrar pelo telefone
     let customer = await queryOne<Customer>(`SELECT * FROM customers WHERE tenant_id = $1 AND phone = $2`, [
@@ -32,7 +34,9 @@ export class CustomerService {
     ])
 
     if (customer) {
-      console.log(`Customer found: ${customer.name} (${customer.id})`)
+      if (isDebugMode) {
+        console.log(`Customer found: ${customer.name} (${customer.id})`)
+      }
       
       // Atualiza dados se necessário (mantém dados mais completos)
       // Só atualiza se o novo valor é válido (não vazio) E diferente do atual
@@ -46,9 +50,13 @@ export class CustomerService {
         if (shouldUpdateEmail) updateData.email = customerData.email
         if (shouldUpdateDocument) updateData.document = customerData.document
         
-        console.log("Updating customer with new data:", updateData)
+        if (isDebugMode) {
+          console.log("Updating customer with new data:", updateData)
+        }
         customer = await update<Customer>("customers", customer.id, updateData)
-        console.log("✓ Customer updated successfully")
+        if (isDebugMode) {
+          console.log("✓ Customer updated successfully")
+        }
       }
       return customer!
     }
@@ -64,9 +72,13 @@ export class CustomerService {
       tags: JSON.stringify([]),
     }
     
-    console.log("Creating new customer:", newCustomerData)
+    if (isDebugMode) {
+      console.log("Creating new customer:", newCustomerData)
+    }
     customer = await insert<Customer>("customers", newCustomerData)
-    console.log(`✓ New customer created: ${customer.name} (${customer.id})`)
+    if (isDebugMode) {
+      console.log(`✓ New customer created: ${customer.name} (${customer.id})`)
+    }
 
     return customer
   }

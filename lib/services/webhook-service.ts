@@ -28,15 +28,22 @@ export class WebhookService {
    * Processa webhook da Cakto
    */
   async processWebhook(payload: CaktoWebhookPayload): Promise<WebhookEvent> {
-    // Log detalhado do payload recebido para debugging
-    console.log("=== CAKTO WEBHOOK RECEIVED ===")
-    console.log("Event Type:", payload.event)
-    console.log("Transaction ID:", payload.transaction_id || "N/A")
-    console.log("Customer Data:", JSON.stringify(payload.customer, null, 2))
-    console.log("Product Data:", JSON.stringify(payload.product, null, 2))
-    console.log("Payment Data:", JSON.stringify(payload.payment, null, 2))
-    console.log("Metadata:", JSON.stringify(payload.metadata, null, 2))
-    console.log("==============================")
+    const isDebugMode = process.env.NODE_ENV === "development" || process.env.WEBHOOK_DEBUG_LOG === "true"
+    
+    // Log detalhado do payload recebido para debugging (apenas em development)
+    if (isDebugMode) {
+      console.log("=== CAKTO WEBHOOK RECEIVED ===")
+      console.log("Event Type:", payload.event)
+      console.log("Transaction ID:", payload.transaction_id || "N/A")
+      console.log("Customer Data:", JSON.stringify(payload.customer, null, 2))
+      console.log("Product Data:", JSON.stringify(payload.product, null, 2))
+      console.log("Payment Data:", JSON.stringify(payload.payment, null, 2))
+      console.log("Metadata:", JSON.stringify(payload.metadata, null, 2))
+      console.log("==============================")
+    } else {
+      // Em produção, log apenas informações essenciais (sem dados sensíveis)
+      console.log(`Webhook received: ${payload.event} - Transaction: ${payload.transaction_id || "N/A"}`)
+    }
 
     // Registra o evento
     const event = await insert<WebhookEvent>("webhook_events", {
@@ -50,7 +57,7 @@ export class WebhookService {
 
     try {
       // Processa baseado no tipo de evento
-      await this.handleEvent(payload)
+      await this.handleEvent(payload, isDebugMode)
 
       // Marca como processado
       await update("webhook_events", event.id, {
@@ -58,7 +65,9 @@ export class WebhookService {
         processed_at: new Date().toISOString(),
       })
 
-      console.log(`✓ Webhook ${event.id} processed successfully`)
+      if (isDebugMode) {
+        console.log(`✓ Webhook ${event.id} processed successfully`)
+      }
       return { ...event, processed: true }
     } catch (error) {
       // Registra erro
@@ -75,40 +84,50 @@ export class WebhookService {
   /**
    * Processa evento específico
    */
-  private async handleEvent(payload: CaktoWebhookPayload): Promise<void> {
+  private async handleEvent(payload: CaktoWebhookPayload, isDebugMode = false): Promise<void> {
     // Cria ou atualiza cliente (se dados disponíveis)
     let customer = null
     let customerId = null
     
     if (payload.customer?.phone?.trim()) {
-      console.log("Creating/updating customer with data:", {
-        name: payload.customer.name,
-        email: payload.customer.email,
-        phone: payload.customer.phone,
-        document: payload.customer.document,
-      })
-      customer = await this.customerService.findOrCreateFromWebhook(payload)
+      if (isDebugMode) {
+        console.log("Creating/updating customer with data:", {
+          name: payload.customer.name,
+          email: payload.customer.email,
+          phone: payload.customer.phone,
+          document: payload.customer.document,
+        })
+      }
+      customer = await this.customerService.findOrCreateFromWebhook(payload, isDebugMode)
       customerId = customer.id
-      console.log(`✓ Customer processed: ${customer.name} (${customer.id})`)
+      if (isDebugMode) {
+        console.log(`✓ Customer processed: ${customer.name} (${customer.id})`)
+      }
     } else {
       console.warn("⚠ No customer phone found in webhook payload - skipping customer creation")
     }
 
     // Cria ou atualiza pedido
-    console.log("Creating/updating order with data:", {
-      transaction_id: payload.transaction_id,
-      product_name: payload.product?.name,
-      product_id: payload.product?.id,
-      amount: payload.payment?.amount || payload.product?.price,
-      payment_method: payload.payment?.method,
-      event: payload.event,
-    })
-    const order = await this.orderService.createFromWebhook(payload, customerId)
-    console.log(`✓ Order processed: ${order.id}`)
+    if (isDebugMode) {
+      console.log("Creating/updating order with data:", {
+        transaction_id: payload.transaction_id,
+        product_name: payload.product?.name,
+        product_id: payload.product?.id,
+        amount: payload.payment?.amount || payload.product?.price,
+        payment_method: payload.payment?.method,
+        event: payload.event,
+      })
+    }
+    const order = await this.orderService.createFromWebhook(payload, customerId, isDebugMode)
+    if (isDebugMode) {
+      console.log(`✓ Order processed: ${order.id}`)
+    }
 
     // Se evento de aprovação, cancela mensagens pendentes
     if (payload.event === "purchase_approved") {
-      console.log("Purchase approved - canceling pending messages")
+      if (isDebugMode) {
+        console.log("Purchase approved - canceling pending messages")
+      }
       await this.messageService.cancelOrderMessages(order.id)
     }
 
@@ -116,12 +135,16 @@ export class WebhookService {
     if (customer) {
       // Busca fluxos ativos para este evento
       const flows = await this.flowService.findActiveByEventType(payload.event)
-      console.log(`Found ${flows.length} active flow(s) for event ${payload.event}`)
+      if (isDebugMode) {
+        console.log(`Found ${flows.length} active flow(s) for event ${payload.event}`)
+      }
 
       // Agenda mensagens dos fluxos
       for (const flow of flows) {
-        const scheduled = await this.messageService.scheduleFlowMessages(flow, customer, order)
-        console.log(`✓ Scheduled ${scheduled.length} message(s) from flow "${flow.name}"`)
+        const scheduled = await this.messageService.scheduleFlowMessages(flow, customer, order, isDebugMode)
+        if (isDebugMode) {
+          console.log(`✓ Scheduled ${scheduled.length} message(s) from flow "${flow.name}"`)
+        }
       }
     } else {
       console.warn("⚠ No customer available - skipping message scheduling")

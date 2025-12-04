@@ -16,7 +16,7 @@ export class MessageService {
   /**
    * Agenda mensagens de um fluxo para um cliente
    */
-  async scheduleFlowMessages(flow: MessageFlow, customer: Customer, order: Order): Promise<ScheduledMessage[]> {
+  async scheduleFlowMessages(flow: MessageFlow, customer: Customer, order: Order, isDebugMode = false): Promise<ScheduledMessage[]> {
     if (!flow.messages || flow.messages.length === 0) {
       return []
     }
@@ -37,16 +37,18 @@ export class MessageService {
       link_pix: order.pix_code || "",
     }
 
-    console.log("Message variables for flow:", {
-      nome: variables.nome,
-      email: variables.email || "(empty)",
-      telefone: variables.telefone,
-      produto: variables.produto || "(empty)",
-      preco: variables.preco || "(empty)",
-      hasLinkBoleto: !!variables.link_boleto,
-      hasQrCode: !!variables.qr_code,
-      hasLinkCheckout: !!variables.link_checkout,
-    })
+    if (isDebugMode) {
+      console.log("Message variables for flow:", {
+        nome: variables.nome,
+        email: variables.email || "(empty)",
+        telefone: variables.telefone,
+        produto: variables.produto || "(empty)",
+        preco: variables.preco || "(empty)",
+        hasLinkBoleto: !!variables.link_boleto,
+        hasQrCode: !!variables.qr_code,
+        hasLinkCheckout: !!variables.link_checkout,
+      })
+    }
 
     for (const message of flow.messages) {
       if (!message.is_active) continue
@@ -74,7 +76,9 @@ export class MessageService {
         attempts: 0,
       })
 
-      console.log(`  → Message scheduled for ${scheduledFor.toISOString()} (delay: ${cumulativeDelay}min)`)
+      if (isDebugMode) {
+        console.log(`  → Message scheduled for ${scheduledFor.toISOString()} (delay: ${cumulativeDelay}min)`)
+      }
       scheduledMessages.push(scheduled)
     }
 
