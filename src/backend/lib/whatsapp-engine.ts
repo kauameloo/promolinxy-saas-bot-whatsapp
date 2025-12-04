@@ -612,6 +612,48 @@ export class WhatsAppEngine {
   }
 
   /**
+   * Resolves the correct chat ID format (LID or c.us) for a phone number
+   * WhatsApp now requires @lid format for some phone numbers
+   * 
+   * Note: This method should only be called when the client is connected,
+   * as it relies on the WhatsApp Web API to retrieve LID information.
+   */
+  private async resolveChatId(phoneNumber: string): Promise<string> {
+    // If already formatted with suffix, return as-is
+    if (phoneNumber.includes("@")) {
+      return phoneNumber
+    }
+
+    // Guard: Ensure client is available
+    if (!this.client) {
+      console.warn(`[WhatsApp Engine] Client not available for LID lookup, using fallback format`)
+      return `${phoneNumber}@c.us`
+    }
+
+    try {
+      // Try to get LID and phone info for the user
+      const lidInfo = await this.client.getContactLidAndPhone([phoneNumber])
+      
+      if (lidInfo && lidInfo.length > 0 && lidInfo[0].lid) {
+        const lid = lidInfo[0].lid
+        // Basic validation: LID should contain @ symbol
+        if (lid.includes("@")) {
+          console.log(`[WhatsApp Engine] Using LID format for ${phoneNumber}: ${lid}`)
+          return lid
+        } else {
+          console.warn(`[WhatsApp Engine] Invalid LID format received: ${lid}, using fallback`)
+        }
+      }
+    } catch (error) {
+      // If LID lookup fails, log but continue with fallback
+      console.warn(`[WhatsApp Engine] LID lookup failed for ${phoneNumber}, using fallback:`, error)
+    }
+
+    // Fallback to standard c.us format
+    return `${phoneNumber}@c.us`
+  }
+
+  /**
    * Envia uma mensagem de texto
    */
   async sendMessage(message: WhatsAppMessage): Promise<SendMessageResult> {
@@ -641,7 +683,8 @@ export class WhatsAppEngine {
         return { success: false, error: "Puppeteer page indisponível. Reconectando, tente novamente em alguns segundos." }
       }
 
-      const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
+      // Resolve the correct chat ID format (LID or c.us)
+      const chatId = await this.resolveChatId(message.to)
       const result = await this.client.sendMessage(chatId, message.content)
       
       console.log(
@@ -708,7 +751,8 @@ export class WhatsAppEngine {
 
     try {
       const media = await MessageMedia.fromUrl(message.mediaUrl)
-      const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
+      // Resolve the correct chat ID format (LID or c.us)
+      const chatId = await this.resolveChatId(message.to)
       const result = await this.client.sendMessage(chatId, media, { caption: message.content })
       
       console.log(`[WhatsApp Engine] Media sent to ${message.to}`)
