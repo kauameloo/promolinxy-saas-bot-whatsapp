@@ -1,0 +1,25 @@
+#messagePanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #286b2a;
+  padding: 20px;
+  color: white;
+  border: 1px solid #ddd;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+}
+
+#messagePanel .closeButton {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  cursor: pointer;
+  background: red;
+  border: none;
+  font-size: 16px;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 50%;
+}

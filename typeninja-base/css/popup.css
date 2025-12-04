@@ -1,0 +1,220 @@
+body {
+  width: 300px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  padding: 20px;
+}
+
+h1 {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+h3{
+  text-align: center;
+}
+
+.bodylogin {
+  background-color: #f2fff1;
+  font-family: Arial, sans-serif;
+  border-radius: 5px;
+}
+
+.tool label {
+  display: block;
+  font-weight: bold;
+}
+
+.tool input[type="text"] {
+  width: 90%;
+  padding: 7px;
+  padding-right: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+#btn-ativar-lb {
+  background-color: #00a859;
+  color: #fff;
+  border: none;
+  margin-left: 20px;
+  border-radius: 3px;
+  padding: 10px 20px;
+  cursor: pointer;
+  float: left;
+}
+
+#btn-premium-lb {
+  background-color: #0073e6;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  margin-right: 20px;
+  padding: 10px 20px;
+  cursor: pointer;
+  float: right;
+}
+
+label input[type="checkbox"] {
+  margin-right: 5px;
+  transform: scale(1.20);
+}
+
+#urlAPI {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  margin-top: 10px;
+}
+
+#typeBotConfig {
+  margin-top: 20px;
+  background-color: #d9fdd7;
+  border-radius: 5px;
+  margin-right: -5px;
+  height: 0;
+  overflow: hidden;
+  transition: height 0.1s ease-in-out;
+}
+
+#typeBotConfig.expanded {
+  padding: 15px;
+  height: calc(105vh);
+}
+
+#typeBotConfig.freeExpanded {
+  padding: 15px;
+  height: calc(35vh);
+}
+
+#configTxt {
+  text-align: center;
+}
+
+#typeBotConfig span {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+#typeBotConfig input[type="number"] {
+  width: 50px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  margin-top: 5px;
+}
+#changePollToList {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.linkInput textarea {
+  width: 250px;
+  height: 100px;
+  padding: 5px;
+  padding-right: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  margin-top: 10px;
+  font-family: "Arial", sans-serif;
+  font-size: 14px;
+}
+
+button {
+  background-color: #00a859;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 10px 20px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+#showTypeBotConfig {
+  background-color: #47a3fe;
+  float: right;
+  size: 5px;
+  border-radius: 20px;
+  padding: 10px 20px;
+}
+
+#saveBot {
+  background-color: #0073e6;
+  float: left;
+}
+
+#resetNumbers {
+  background-color: #ff0000;
+  float: right;
+}
+
+#buttonConfig {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+#formLogin{
+  padding: 15px;
+  padding-right: 15px;
+}
+
+.button-close {
+  cursor: pointer;
+  width: 20px;
+  height: auto;
+  background-color: #0073e6;
+  color: #fff;
+  border: solid 1px #0095cc;
+  text-align: center;
+  float: right;
+  padding: 3px;
+  border-radius: 3px;
+}
+
+.field input {
+  display: none;
+}
+
+.field label {
+  background: red;
+  border-radius: 20px;
+  cursor: pointer;
+  margin-right: 10px;
+  height: 35px;
+  position: relative;
+  width: 50px;
+  float: right;
+
+  i:before {
+    color: white;
+    display: block;
+    font-size: 2em;
+    left: 0;
+    margin: auto;
+    position: absolute;
+    right: 0;
+    text-align: center;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: all 0.3s ease;
+  }
+}
+
+.field input:checked + label {
+  background: #00a859;
+}
+
+.field label.gray {
+  background: gray;
+}
+
+.configurationButton {
+  display: block;
+}
+
+.buttonsTool {
+  display: flex;
+  justify-content: space-between;
+}
