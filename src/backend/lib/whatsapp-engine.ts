@@ -616,17 +616,23 @@ export class WhatsAppEngine {
    * Removes special characters and ensures proper format
    */
   private normalizePhoneNumber(phone: string): string {
-    // Remove all non-numeric characters except + at the start
-    let normalized = phone.replace(/[^\d+]/g, '')
+    // Handle leading + separately
+    let normalized = phone
+    const hasLeadingPlus = normalized.startsWith('+')
     
-    // Remove leading + if present
-    if (normalized.startsWith('+')) {
+    // Remove leading + temporarily
+    if (hasLeadingPlus) {
       normalized = normalized.substring(1)
     }
     
-    // Ensure we have a valid phone number (at least 10 digits)
-    if (normalized.length < 10) {
-      throw new Error(`Invalid phone number format: ${phone}`)
+    // Remove all non-numeric characters
+    normalized = normalized.replace(/[^\d]/g, '')
+    
+    // Validate we have a valid phone number
+    // Configurable minimum length (default 10, can be overridden via env)
+    const minLength = parseInt(process.env.PHONE_MIN_LENGTH || "10", 10)
+    if (normalized.length < minLength) {
+      throw new Error(`Invalid phone number format: ${phone} (minimum ${minLength} digits required)`)
     }
     
     return normalized
@@ -645,8 +651,9 @@ export class WhatsAppEngine {
       return isRegistered
     } catch (error) {
       console.warn(`[WhatsApp Engine] Error checking if number is registered: ${chatId}`, error)
-      // If we can't check, assume it's registered to avoid blocking sends
-      return true
+      // If we can't check due to error, return false to be safe and avoid LID errors
+      // The error message will guide the user to retry
+      return false
     }
   }
 

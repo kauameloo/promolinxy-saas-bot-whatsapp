@@ -105,9 +105,12 @@ export class MessageService {
         }
         scheduledMessages.push(scheduled)
       } catch (error) {
-        // If unique constraint violation, log and skip (message already exists)
-        const errorMsg = error instanceof Error ? error.message : String(error)
-        if (errorMsg.includes("unique") || errorMsg.includes("duplicate")) {
+        // If unique constraint violation (PostgreSQL error code 23505), log and skip
+        const isUniqueViolation = 
+          (error && typeof error === 'object' && 'code' in error && error.code === '23505') ||
+          (error instanceof Error && (error.message.includes("unique") || error.message.includes("duplicate")))
+        
+        if (isUniqueViolation) {
           if (isDebugMode) {
             console.log(`  ⊗ Duplicate message detected for flow_message ${message.id}, skipping`)
           }
