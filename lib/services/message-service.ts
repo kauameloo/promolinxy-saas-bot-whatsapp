@@ -62,24 +62,55 @@ export class MessageService {
       // Processa o template
       const processedContent = parseMessage(message.content, variables)
 
-      // Cria mensagem agendada
-      const scheduled = await insert<ScheduledMessage>("scheduled_messages", {
-        tenant_id: this.tenantId,
-        customer_id: customer.id,
-        order_id: order.id,
-        flow_id: flow.id,
-        flow_message_id: message.id,
-        phone: customer.phone,
-        message_content: processedContent,
-        scheduled_for: scheduledFor.toISOString(),
-        status: "pending",
-        attempts: 0,
-      })
+      try {
+        // Check if this exact message is already scheduled
+        const existing = await queryOne<ScheduledMessage>(
+          `SELECT id FROM scheduled_messages 
+           WHERE tenant_id = $1 
+           AND order_id = $2 
+           AND flow_message_id = $3 
+           AND status IN ('pending', 'processing')
+           LIMIT 1`,
+          [this.tenantId, order.id, message.id]
+        )
 
-      if (isDebugMode) {
-        console.log(`  → Message scheduled for ${scheduledFor.toISOString()} (delay: ${cumulativeDelay}min)`)
+        if (existing) {
+          if (isDebugMode) {
+            console.log(`  ⊗ Message already scheduled for flow_message ${message.id} and order ${order.id}, skipping`)
+          }
+          continue
+        }
+
+        // Cria mensagem agendada
+        const scheduled = await insert<ScheduledMessage>("scheduled_messages", {
+          tenant_id: this.tenantId,
+          customer_id: customer.id,
+          order_id: order.id,
+          flow_id: flow.id,
+          flow_message_id: message.id,
+          phone: customer.phone,
+          message_content: processedContent,
+          scheduled_for: scheduledFor.toISOString(),
+          status: "pending",
+          attempts: 0,
+        })
+
+        if (isDebugMode) {
+          console.log(`  → Message scheduled for ${scheduledFor.toISOString()} (delay: ${cumulativeDelay}min)`)
+        }
+        scheduledMessages.push(scheduled)
+      } catch (error) {
+        // If unique constraint violation, log and skip (message already exists)
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        if (errorMsg.includes("unique") || errorMsg.includes("duplicate")) {
+          if (isDebugMode) {
+            console.log(`  ⊗ Duplicate message detected for flow_message ${message.id}, skipping`)
+          }
+          continue
+        }
+        // Re-throw other errors
+        throw error
       }
-      scheduledMessages.push(scheduled)
     }
 
     return scheduledMessages
