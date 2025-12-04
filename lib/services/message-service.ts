@@ -50,8 +50,31 @@ export class MessageService {
       })
     }
 
+    // Batch check for existing messages to avoid N+1 queries
+    const flowMessageIds = flow.messages.filter(m => m.is_active).map(m => m.id)
+    const existingMessages = flowMessageIds.length > 0 
+      ? await query<{ flow_message_id: string }>(
+          `SELECT flow_message_id FROM scheduled_messages 
+           WHERE tenant_id = $1 
+           AND order_id = $2 
+           AND flow_message_id = ANY($3)
+           AND status IN ('pending', 'processing')`,
+          [this.tenantId, order.id, flowMessageIds]
+        )
+      : []
+    
+    const existingFlowMessageIds = new Set(existingMessages.map(m => m.flow_message_id))
+
     for (const message of flow.messages) {
       if (!message.is_active) continue
+
+      // Skip if already scheduled (using batch check result)
+      if (existingFlowMessageIds.has(message.id)) {
+        if (isDebugMode) {
+          console.log(`  ⊗ Message already scheduled for flow_message ${message.id} and order ${order.id}, skipping`)
+        }
+        continue
+      }
 
       cumulativeDelay += message.delay_minutes
 
@@ -63,24 +86,6 @@ export class MessageService {
       const processedContent = parseMessage(message.content, variables)
 
       try {
-        // Check if this exact message is already scheduled
-        const existing = await queryOne<ScheduledMessage>(
-          `SELECT id FROM scheduled_messages 
-           WHERE tenant_id = $1 
-           AND order_id = $2 
-           AND flow_message_id = $3 
-           AND status IN ('pending', 'processing')
-           LIMIT 1`,
-          [this.tenantId, order.id, message.id]
-        )
-
-        if (existing) {
-          if (isDebugMode) {
-            console.log(`  ⊗ Message already scheduled for flow_message ${message.id} and order ${order.id}, skipping`)
-          }
-          continue
-        }
-
         // Cria mensagem agendada
         const scheduled = await insert<ScheduledMessage>("scheduled_messages", {
           tenant_id: this.tenantId,

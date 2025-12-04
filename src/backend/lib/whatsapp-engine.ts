@@ -691,7 +691,8 @@ export class WhatsAppEngine {
         }
       }
 
-      const chatId = normalizedPhone.includes("@c.us") ? normalizedPhone : `${normalizedPhone}@c.us`
+      // Format as WhatsApp chat ID (always append @c.us since normalized phone is just digits)
+      const chatId = `${normalizedPhone}@c.us`
       
       // Check if the number is registered on WhatsApp to prevent "No LID" errors
       const isRegistered = await this.isRegisteredWhatsAppNumber(chatId)
@@ -789,7 +790,8 @@ export class WhatsAppEngine {
         }
       }
 
-      const chatId = normalizedPhone.includes("@c.us") ? normalizedPhone : `${normalizedPhone}@c.us`
+      // Format as WhatsApp chat ID (always append @c.us since normalized phone is just digits)
+      const chatId = `${normalizedPhone}@c.us`
       
       // Check if the number is registered on WhatsApp to prevent "No LID" errors
       const isRegistered = await this.isRegisteredWhatsAppNumber(chatId)
