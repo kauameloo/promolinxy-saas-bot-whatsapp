@@ -15,7 +15,7 @@ export class OrderService {
   /**
    * Cria ou atualiza pedido baseado no webhook
    */
-  async createFromWebhook(payload: CaktoWebhookPayload, customerId: string): Promise<Order> {
+  async createFromWebhook(payload: CaktoWebhookPayload, customerId?: string): Promise<Order> {
     const externalId = payload.transaction_id
 
     // Se já existe, atualiza
