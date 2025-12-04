@@ -3,7 +3,7 @@
 // =====================================================
 
 import { WhatsAppEngine, whatsappManager } from "./lib/whatsapp-engine"
-// MessageQueue removed - using standalone queue-worker.js instead to avoid duplicate processing
+// MessageQueue removed - using standalone queue-worker instead to avoid duplicate processing
 import { query, queryOne, update, dbPool, closePool } from "./lib/db"
 import type { WhatsAppSession, Tenant } from "./lib/types"
 import express, { Application, Request, Response, NextFunction } from "express"
