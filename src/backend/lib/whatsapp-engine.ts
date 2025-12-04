@@ -612,6 +612,33 @@ export class WhatsAppEngine {
   }
 
   /**
+   * Resolves the correct chat ID format (LID or c.us) for a phone number
+   * WhatsApp now requires @lid format for some phone numbers
+   */
+  private async resolveChatId(phoneNumber: string): Promise<string> {
+    // If already formatted with suffix, return as-is
+    if (phoneNumber.includes("@")) {
+      return phoneNumber
+    }
+
+    try {
+      // Try to get LID for the user
+      const lidInfo = await this.client!.getContactLidAndPhone([phoneNumber])
+      
+      if (lidInfo && lidInfo.length > 0 && lidInfo[0].lid) {
+        console.log(`[WhatsApp Engine] Using LID format for ${phoneNumber}: ${lidInfo[0].lid}`)
+        return lidInfo[0].lid
+      }
+    } catch (error) {
+      // If LID lookup fails, log but continue with fallback
+      console.warn(`[WhatsApp Engine] LID lookup failed for ${phoneNumber}, using fallback:`, error)
+    }
+
+    // Fallback to standard c.us format
+    return `${phoneNumber}@c.us`
+  }
+
+  /**
    * Envia uma mensagem de texto
    */
   async sendMessage(message: WhatsAppMessage): Promise<SendMessageResult> {
@@ -641,7 +668,8 @@ export class WhatsAppEngine {
         return { success: false, error: "Puppeteer page indisponível. Reconectando, tente novamente em alguns segundos." }
       }
 
-      const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
+      // Resolve the correct chat ID format (LID or c.us)
+      const chatId = await this.resolveChatId(message.to)
       const result = await this.client.sendMessage(chatId, message.content)
       
       console.log(
@@ -708,7 +736,8 @@ export class WhatsAppEngine {
 
     try {
       const media = await MessageMedia.fromUrl(message.mediaUrl)
-      const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
+      // Resolve the correct chat ID format (LID or c.us)
+      const chatId = await this.resolveChatId(message.to)
       const result = await this.client.sendMessage(chatId, media, { caption: message.content })
       
       console.log(`[WhatsApp Engine] Media sent to ${message.to}`)
