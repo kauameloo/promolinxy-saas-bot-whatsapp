@@ -157,8 +157,7 @@ export class AnalyticsService {
     )
 
     // Upsert na tabela de métricas
-    const sqlInstance = sql()
-    await sqlInstance`
+    await sql`
       INSERT INTO analytics_daily (tenant_id, date, messages_sent, messages_delivered, messages_read, messages_failed, webhooks_received, conversions, revenue)
       VALUES (${this.tenantId}, ${today}, ${Number.parseInt(metrics?.sent || "0")}, ${Number.parseInt(metrics?.delivered || "0")}, ${Number.parseInt(metrics?.read || "0")}, ${Number.parseInt(metrics?.failed || "0")}, ${Number.parseInt(metrics?.webhooks || "0")}, ${Number.parseInt(metrics?.conversions || "0")}, ${Number.parseFloat(metrics?.revenue || "0")})
       ON CONFLICT (tenant_id, date) 
