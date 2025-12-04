@@ -3,7 +3,6 @@
 // =====================================================
 
 import { WhatsAppEngine, whatsappManager } from "./lib/whatsapp-engine"
-import { MessageQueue } from "./lib/message-queue"
 import { query, queryOne, update, dbPool, closePool } from "./lib/db"
 import type { WhatsAppSession, Tenant } from "./lib/types"
 import express, { Application, Request, Response, NextFunction } from "express"
@@ -16,9 +15,6 @@ const HOST = process.env.WHATSAPP_HOST || "0.0.0.0"
 // Middleware
 app.use(cors())
 app.use(express.json())
-
-// Store active queues
-const activeQueues: Map<string, MessageQueue> = new Map()
 
 // =====================================================
 // API ROUTES
@@ -124,11 +120,7 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
           updated_at: new Date().toISOString(),
         })
         console.log(`[WhatsApp ${tenantId}] Connected: ${phoneNumber}`)
-
-  // Start message queue for this tenant
-  // Option A: Disable internal MessageQueue to avoid duplicate processing.
-  // The standalone queue-worker is responsible for scheduling.
-  console.log(`[Queue] Internal MessageQueue disabled. Standalone worker will process tenant ${tenantId}`)
+        console.log(`[WhatsApp ${tenantId}] Message processing handled by standalone queue-worker`)
       },
       onDisconnected: async (reason: string) => {
         await update("whatsapp_sessions", session!.id, {
@@ -136,9 +128,6 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
           updated_at: new Date().toISOString(),
         })
         console.log(`[WhatsApp ${tenantId}] Disconnected: ${reason}`)
-
-        // Stop message queue
-        stopMessageQueue(tenantId)
       },
       onMessage: async (message) => {
         console.log(`[WhatsApp ${tenantId}] Incoming message from ${message.from}: ${message.body}`)
@@ -167,7 +156,6 @@ app.post("/api/whatsapp/disconnect/:tenantId", async (req: Request, res: Respons
     const { preserveSession } = req.body as { preserveSession?: boolean }
 
     await whatsappManager.removeEngine(tenantId, preserveSession)
-    stopMessageQueue(tenantId)
 
     const session = await queryOne<WhatsAppSession>(
       `SELECT * FROM whatsapp_sessions WHERE tenant_id = $1 LIMIT 1`,
@@ -342,36 +330,6 @@ app.post("/api/whatsapp/cleanup-legacy", async (req: Request, res: Response) => 
 })
 
 // =====================================================
-// MESSAGE QUEUE MANAGEMENT
-// =====================================================
-
-function startMessageQueue(tenantId: string, engine: WhatsAppEngine): void {
-  if (activeQueues.has(tenantId)) {
-    console.log(`[Queue] Queue already running for tenant ${tenantId}`)
-    return
-  }
-
-  const queue = new MessageQueue(tenantId, engine, {
-    batchSize: 10,
-    intervalMs: 5000,
-    maxRetries: 3,
-  })
-
-  queue.start()
-  activeQueues.set(tenantId, queue)
-  console.log(`[Queue] Started for tenant ${tenantId}`)
-}
-
-function stopMessageQueue(tenantId: string): void {
-  const queue = activeQueues.get(tenantId)
-  if (queue) {
-    queue.stop()
-    activeQueues.delete(tenantId)
-    console.log(`[Queue] Stopped for tenant ${tenantId}`)
-  }
-}
-
-// =====================================================
 // SERVER STARTUP
 // =====================================================
 
@@ -445,8 +403,7 @@ async function initializeActiveConnections(): Promise<void> {
               updated_at: new Date().toISOString(),
             })
             console.log(`[Server] Session ${session.tenant_id} restored successfully`)
-            // Option A: Disable internal MessageQueue; rely on standalone queue-worker
-            console.log(`[Server] Internal MessageQueue disabled for tenant ${session.tenant_id}.`)
+            console.log(`[Server] Message processing handled by standalone queue-worker`)
           },
           onDisconnected: async (reason: string) => {
             await update("whatsapp_sessions", session.id, {
@@ -454,7 +411,6 @@ async function initializeActiveConnections(): Promise<void> {
               updated_at: new Date().toISOString(),
             })
             console.log(`[Server] Session ${session.tenant_id} disconnected: ${reason}`)
-            stopMessageQueue(session.tenant_id)
           },
         })
 
@@ -492,12 +448,6 @@ const server = app.listen(Number(PORT), HOST, () => {
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("[WhatsApp Server] SIGTERM received, shutting down gracefully...")
-
-  // Stop all message queues
-  for (const [tenantId, queue] of activeQueues) {
-    queue.stop()
-    console.log(`[Queue] Stopped queue for tenant ${tenantId}`)
-  }
 
   // Disconnect all WhatsApp sessions
   const sessions = whatsappManager.getAllSessions()
