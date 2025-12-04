@@ -1,11 +1,31 @@
 # TypeBot Bridge Docker Build Instructions
 
-## Building the Docker Image
+## Prerequisites
 
-To build the TypeBot Bridge Docker image:
+Before building the Docker image, you need to build the TypeScript code locally:
 
 ```bash
+# Install dependencies
+PUPPETEER_SKIP_DOWNLOAD=true npm install
+
+# Build the backend code
+npm run build:backend
+```
+
+This will create the `dist` directory with the compiled JavaScript files.
+
+## Building the Docker Image
+
+**IMPORTANT**: Make sure you've built the code locally first (see Prerequisites above).
+
+Then, you need to temporarily allow the `dist` directory in Docker builds. Create a `.dockerignore.typebot` file or modify your build command:
+
+```bash
+# Option 1: Build with custom dockerignore (create .dockerignore.typebot without 'dist')
 docker build -f Dockerfile.typebot-bridge -t kauameloo/typebot-bridge:latest .
+
+# Option 2: Or use the simplified Dockerfile that copies only what's needed
+docker build -f Dockerfile.typebot-bridge -t kauameloo/typebot-bridge:latest --build-arg COPY_DIST=true .
 ```
 
 ## Pushing to Docker Hub
@@ -14,11 +34,40 @@ docker build -f Dockerfile.typebot-bridge -t kauameloo/typebot-bridge:latest .
 # Login to Docker Hub
 docker login
 
-# Tag the image
+# Tag the image (if needed)
 docker tag kauameloo/typebot-bridge:latest kauameloo/typebot-bridge:latest
 
 # Push to Docker Hub
 docker push kauameloo/typebot-bridge:latest
+
+# Optional: Push with a version tag
+docker tag kauameloo/typebot-bridge:latest kauameloo/typebot-bridge:v1.0.0
+docker push kauameloo/typebot-bridge:v1.0.0
+```
+
+## Quick Build Script
+
+Due to npm dependency issues in Docker, the recommended approach is:
+
+```bash
+# Step 1: Build locally
+PUPPETEER_SKIP_DOWNLOAD=true npm install
+npm run build:backend
+
+# Step 2: Use the custom dockerignore that includes dist
+cp .dockerignore.typebot .dockerignore
+
+# Step 3: Build Docker image
+docker build -f Dockerfile.typebot-bridge -t kauameloo/typebot-bridge:latest .
+
+# Step 4: Restore original dockerignore  
+git checkout .dockerignore
+```
+
+Or use this one-liner:
+
+```bash
+PUPPETEER_SKIP_DOWNLOAD=true npm install && npm run build:backend && cp .dockerignore.typebot .dockerignore && docker build -f Dockerfile.typebot-bridge -t kauameloo/typebot-bridge:latest . && git checkout .dockerignore
 ```
 
 ## Running the Image Locally
@@ -40,7 +89,7 @@ docker run -p 3010:3010 \
 The typebot-bridge service is already configured in your docker-compose.yml. Simply run:
 
 ```bash
-docker-compose up -d typebot-bridge
+docker-compose up -d typebot-bridge typebot-bridge-worker
 ```
 
 ## Service Endpoints
@@ -90,3 +139,20 @@ Both processes run in the same container using PM2.
 ## Health Check
 
 The container includes a health check that pings the `/health` endpoint every 30 seconds.
+
+## Troubleshooting
+
+### Build fails with "npm error Exit handler never called"
+
+This is a known issue with npm in Docker. Solutions:
+1. Build the TypeScript code locally first (see Prerequisites)
+2. Use `--legacy-peer-deps` flag
+3. Delete `node_modules` and `package-lock.json` and rebuild
+
+### tsc: not found error
+
+Make sure you've installed dependencies locally before building:
+```bash
+PUPPETEER_SKIP_DOWNLOAD=true npm install
+npm run build:backend
+```

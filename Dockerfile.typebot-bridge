@@ -1,11 +1,15 @@
 # =====================================================
 # DOCKERFILE - TypeBot Bridge Service
 # Standalone microservice for bidirectional WhatsApp <-> TypeBot
+# 
+# PREREQUISITES: 
+# 1. Build TypeScript code locally: npm run build:backend
+# 2. This creates the 'dist' directory which is copied into the image
 # =====================================================
 
 FROM node:20-slim
 
-# Install system dependencies
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -13,49 +17,28 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
+# Skip puppeteer download (not needed for typebot-bridge)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 WORKDIR /app
 
-# Copy dependency files
-COPY package*.json pnpm-lock.yaml* yarn.lock* ./
+# Copy package files
+COPY package.json ./
 
-# Install dependencies (supports npm, yarn, and pnpm)
-RUN \
-  if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm install --frozen-lockfile; \
-  elif [ -f yarn.lock ]; then \
-    yarn --frozen-lockfile; \
-  else \
-    npm ci; \
-  fi
+# Install only production dependencies
+RUN npm install --production --legacy-peer-deps --no-optional || \
+    npm install --production --legacy-peer-deps || \
+    npm install --production
 
-# Copy source code
-COPY . .
+# Copy PM2 config
+COPY ecosystem.typebot-bridge.config.js ./
 
-# Copy TypeScript configuration for backend
-COPY tsconfig.backend.json ./
-
-# Build the backend TypeScript code
-RUN \
-  if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm run build:backend; \
-  elif [ -f yarn.lock ]; then \
-    yarn build:backend; \
-  else \
-    npm run build:backend; \
-  fi
+# Copy pre-built dist directory
+# NOTE: Must run 'npm run build:backend' locally before building this image
+COPY dist ./dist
 
 # Create directories for config and media
 RUN mkdir -p /app/config /tmp/typebot-media /app/logs
-
-# Remove dev dependencies after build to keep image lean
-RUN \
-  if [ -f pnpm-lock.yaml ]; then \
-    pnpm prune --prod || true; \
-  elif [ -f yarn.lock ]; then \
-    yarn install --production --frozen-lockfile || true; \
-  else \
-    npm prune --production || true; \
-  fi
 
 # Expose port for the API server
 EXPOSE 3010
@@ -65,5 +48,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -fsS http://localhost:3010/health || exit 1
 
 # Default command - runs both server and worker via PM2
-# Can be overridden in docker-compose to run only server or worker
 CMD ["npx", "pm2-runtime", "start", "ecosystem.typebot-bridge.config.js"]
