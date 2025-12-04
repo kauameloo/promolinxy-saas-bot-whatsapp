@@ -492,12 +492,6 @@ function maskPhone(phone: string): string {
   return `${visible}${masked}${lastDigits}`
 }
 
-// Get all sessions status
-app.get("/api/whatsapp/sessions", (_req: Request, res: Response) => {
-  const sessions = whatsappManager.getAllSessions()
-  return res.json({ success: true, data: sessions })
-})
-
 // Get list of persisted sessions (sessions that have saved data)
 app.get("/api/whatsapp/persisted-sessions", (_req: Request, res: Response) => {
   try {

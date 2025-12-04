@@ -18,6 +18,9 @@ import { query } from "../../lib/db"
 // Input validation types
 export type InputType = "text" | "number" | "email" | "phone" | "url" | "date" | "file"
 
+// Constants
+export const RESTART_COMMAND = "/start"
+
 // Bridge configuration
 export interface BridgeConfig {
   flowUrl: string
@@ -102,7 +105,7 @@ export class TypeBotBridge {
       let inputType: InputType | undefined
 
       // Start new chat or continue existing
-      if (!session.sessionId || inbound.body.toLowerCase() === "/start") {
+      if (!session.sessionId || inbound.body.toLowerCase() === RESTART_COMMAND) {
         // Start new chat
         const response = await this.client.startChat({
           phone: inbound.from,

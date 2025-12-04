@@ -226,7 +226,18 @@ export class MessageMapper {
     })
 
     // Get file extension from URL or content type
-    const ext = path.extname(new URL(url).pathname) || this.getExtensionFromContentType(response.headers["content-type"])
+    let ext = ""
+    try {
+      ext = path.extname(new URL(url).pathname)
+    } catch {
+      // Invalid URL, try to get extension from content type
+      ext = ""
+    }
+    
+    if (!ext) {
+      ext = this.getExtensionFromContentType(response.headers["content-type"])
+    }
+    
     const filename = `media_${Date.now()}${ext}`
     const filepath = path.join(os.tmpdir(), filename)
 
