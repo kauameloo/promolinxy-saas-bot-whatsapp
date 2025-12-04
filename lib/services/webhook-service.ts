@@ -66,9 +66,9 @@ export class WebhookService {
   private async handleEvent(payload: CaktoWebhookPayload): Promise<void> {
     // Cria ou atualiza cliente (se dados disponíveis)
     let customer = null
-    let customerId = undefined
+    let customerId = null
     
-    if (payload.customer?.phone) {
+    if (payload.customer?.phone?.trim()) {
       customer = await this.customerService.findOrCreateFromWebhook(payload)
       customerId = customer.id
     }
