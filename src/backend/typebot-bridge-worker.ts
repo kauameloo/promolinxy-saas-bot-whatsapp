@@ -19,6 +19,7 @@ const CONFIG = {
   randomDelayMinMs: parseInt(process.env.TYPEBOT_RANDOM_DELAY_MIN_MS || "200", 10),
   randomDelayMaxMs: parseInt(process.env.TYPEBOT_RANDOM_DELAY_MAX_MS || "800", 10),
   workerIntervalMs: parseInt(process.env.TYPEBOT_WORKER_INTERVAL_MS || "5000", 10),
+  cleanupIterations: parseInt(process.env.TYPEBOT_CLEANUP_ITERATIONS || "10", 10),
 }
 
 // Store bridges per tenant
@@ -28,7 +29,9 @@ const bridges = new Map<string, ReturnType<typeof createTypeBotBridge>>()
  * Get or create bridge for tenant
  */
 function getBridgeForTenant(tenantId: string): ReturnType<typeof createTypeBotBridge> {
-  if (!bridges.has(tenantId)) {
+  let bridge = bridges.get(tenantId)
+  
+  if (!bridge) {
     const bridgeConfig: BridgeConfig = {
       flowUrl: CONFIG.flowUrl,
       token: CONFIG.token,
@@ -44,12 +47,12 @@ function getBridgeForTenant(tenantId: string): ReturnType<typeof createTypeBotBr
       },
     }
     
-    const bridge = createTypeBotBridge(bridgeConfig)
+    bridge = createTypeBotBridge(bridgeConfig)
     bridges.set(tenantId, bridge)
     console.log(`[TypeBot Worker] Created bridge for tenant: ${tenantId}`)
   }
   
-  return bridges.get(tenantId)!
+  return bridge
 }
 
 /**
@@ -155,8 +158,8 @@ async function workerLoop(): Promise<void> {
       // Process queue every iteration
       await processQueue()
       
-      // Cleanup sessions every 10 iterations (~50 seconds with default interval)
-      if (iteration % 10 === 0) {
+      // Cleanup sessions every CONFIG.cleanupIterations iterations
+      if (iteration % CONFIG.cleanupIterations === 0) {
         await cleanupSessions()
       }
       

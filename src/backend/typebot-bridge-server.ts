@@ -50,7 +50,9 @@ app.use((req, res, next) => {
  * Get or create bridge for tenant
  */
 function getBridgeForTenant(tenantId: string): ReturnType<typeof createTypeBotBridge> {
-  if (!bridges.has(tenantId)) {
+  let bridge = bridges.get(tenantId)
+  
+  if (!bridge) {
     const bridgeConfig: BridgeConfig = {
       flowUrl: CONFIG.flowUrl,
       token: CONFIG.token,
@@ -66,12 +68,12 @@ function getBridgeForTenant(tenantId: string): ReturnType<typeof createTypeBotBr
       },
     }
     
-    const bridge = createTypeBotBridge(bridgeConfig)
+    bridge = createTypeBotBridge(bridgeConfig)
     bridges.set(tenantId, bridge)
     console.log(`[TypeBot Bridge] Created bridge for tenant: ${tenantId}`)
   }
   
-  return bridges.get(tenantId)!
+  return bridge
 }
 
 /**
@@ -249,11 +251,12 @@ app.get("/api/typebot/session/:phone", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing tenantId query parameter" })
     }
 
-    // TODO: Implement session retrieval from Redis
-    res.json({
+    // Return 501 Not Implemented for now
+    res.status(501).json({
+      error: "Not Implemented",
+      message: "Session retrieval is not yet implemented",
       phone,
       tenantId,
-      message: "Session info not yet implemented",
     })
   } catch (error) {
     console.error("[TypeBot Bridge] Error getting session:", error)
