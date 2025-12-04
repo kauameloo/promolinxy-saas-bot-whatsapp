@@ -123,20 +123,43 @@ async function processMessage(message: ScheduledMessage): Promise<void> {
 
       console.log(`[Queue Worker] Message ${message.id} sent successfully`)
     } else {
-      // Failure - increment attempts
-      const newAttempts = message.attempts + 1
-      await update("scheduled_messages", message.id, {
-        status: newAttempts >= DEFAULT_CONFIG.maxRetries ? "failed" : "pending",
-        attempts: newAttempts,
-        error_message: result.error,
-      })
+      // Detect LID-related transient errors (WhatsApp Web internal id changes)
+      const errText = result.error || ''
+      const isLidError = /no lid for user|lid is missing|\bLID\b|No LID for user/i.test(errText)
 
-      if (newAttempts >= DEFAULT_CONFIG.maxRetries) {
-        await logMessage(message, "failed", result.error)
-        failedCount++
+      if (isLidError) {
+        // Treat as transient: requeue without incrementing attempts and delay next try
+        const delayMs = parseInt(process.env.LID_RETRY_DELAY_MS || "60000", 10) // default 60s
+        const nextTry = new Date(Date.now() + delayMs).toISOString()
+
+        await update("scheduled_messages", message.id, {
+          status: "pending",
+          // keep attempts unchanged so we don't prematurely mark as failed
+          attempts: message.attempts,
+          error_message: `TRANSIENT_LID_ERROR: ${errText}`,
+          scheduled_for: nextTry,
+          last_attempt: new Date().toISOString(),
+        })
+
+        // Log as transient failure for observability (still mark as 'failed' in logs but note transient)
+        await logMessage(message, "failed", `TRANSIENT_LID_ERROR: ${errText}`)
+        console.warn(`[Queue Worker] Message ${message.id} deferred due to LID error, will retry at ${nextTry}: ${errText}`)
+      } else {
+        // Non-LID failure - increment attempts
+        const newAttempts = message.attempts + 1
+        await update("scheduled_messages", message.id, {
+          status: newAttempts >= DEFAULT_CONFIG.maxRetries ? "failed" : "pending",
+          attempts: newAttempts,
+          error_message: result.error,
+        })
+
+        if (newAttempts >= DEFAULT_CONFIG.maxRetries) {
+          await logMessage(message, "failed", result.error)
+          failedCount++
+        }
+
+        console.log(`[Queue Worker] Message ${message.id} failed: ${result.error}`)
       }
-
-      console.log(`[Queue Worker] Message ${message.id} failed: ${result.error}`)
     }
   } catch (error) {
     console.error(`[Queue Worker] Error processing message ${message.id}:`, error)

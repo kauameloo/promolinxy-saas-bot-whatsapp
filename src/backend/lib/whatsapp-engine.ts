@@ -631,25 +631,87 @@ export class WhatsAppEngine {
     }
 
     try {
-      // Try to get LID and phone info for the user
-      const lidInfo = await this.client.getContactLidAndPhone([phoneNumber])
-      
-      if (lidInfo && lidInfo.length > 0 && lidInfo[0].lid) {
-        const lid = lidInfo[0].lid
-        // Basic validation: LID should contain @ symbol
-        if (lid.includes("@")) {
-          console.log(`[WhatsApp Engine] Using LID format for ${phoneNumber}: ${lid}`)
-          return lid
-        } else {
-          console.warn(`[WhatsApp Engine] Invalid LID format received: ${lid}, using fallback`)
+      const clientAny = this.client as any
+
+      // 1) Preferred: getContactLidAndPhone (returns lid when available)
+      try {
+        if (clientAny && typeof clientAny.getContactLidAndPhone === 'function') {
+          const lidInfo = await clientAny.getContactLidAndPhone([phoneNumber])
+          if (lidInfo && lidInfo.length > 0 && lidInfo[0]?.lid) {
+            const lid = lidInfo[0].lid
+            if (typeof lid === 'string' && lid.includes('@')) {
+              console.log(`[WhatsApp Engine] Using LID format for ${phoneNumber}: ${lid}`)
+              return lid
+            }
+          }
         }
+      } catch (e) {
+        console.warn(`[WhatsApp Engine] getContactLidAndPhone failed for ${phoneNumber}:`, e)
       }
-    } catch (error) {
-      // If LID lookup fails, log but continue with fallback
-      console.warn(`[WhatsApp Engine] LID lookup failed for ${phoneNumber}, using fallback:`, error)
+
+      // 2) Try getNumberId which may return an id object or null
+      try {
+        if (clientAny && typeof clientAny.getNumberId === 'function') {
+          const numId = await clientAny.getNumberId(phoneNumber)
+          if (numId && (numId._serialized || numId.id)) {
+            const idVal = numId._serialized || numId.id || String(numId)
+            console.log(`[WhatsApp Engine] getNumberId resolved for ${phoneNumber}: ${idVal}`)
+            return idVal.includes('@') ? idVal : `${idVal}@c.us`
+          }
+        }
+      } catch (e) {
+        console.warn(`[WhatsApp Engine] getNumberId failed for ${phoneNumber}:`, e)
+      }
+
+      // 3) Try to find contact via getContacts() and use its id
+      try {
+        if (clientAny && typeof clientAny.getContacts === 'function') {
+          const contacts = await clientAny.getContacts()
+          if (Array.isArray(contacts)) {
+            const found = contacts.find((c: any) => {
+              const pn = (c?.phoneNumber || c?.number || c?.pn || '')
+              // compare last digits to be more tolerant
+              return pn && pn.replace(/\D/g, '').endsWith(phoneNumber.replace(/\D/g, ''))
+            })
+            if (found && found.id) {
+              const idVal = found.id._serialized || found.id
+              console.log(`[WhatsApp Engine] Found contact via getContacts for ${phoneNumber}: ${idVal}`)
+              return idVal.includes('@') ? idVal : `${idVal}@c.us`
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`[WhatsApp Engine] getContacts search failed for ${phoneNumber}:`, e)
+      }
+
+      // 4) Try to find chat via getChats() and use its id
+      try {
+        if (clientAny && typeof clientAny.getChats === 'function') {
+          const chats = await clientAny.getChats()
+          if (Array.isArray(chats)) {
+            const foundChat = chats.find((ch: any) => {
+              try {
+                const idStr = ch?.id?._serialized || ch?.id
+                return idStr && idStr.includes(phoneNumber.replace(/\D/g, ''))
+              } catch { return false }
+            })
+            if (foundChat && foundChat.id) {
+              const idVal = foundChat.id._serialized || foundChat.id
+              console.log(`[WhatsApp Engine] Found chat via getChats for ${phoneNumber}: ${idVal}`)
+              return idVal.includes('@') ? idVal : `${idVal}@c.us`
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`[WhatsApp Engine] getChats search failed for ${phoneNumber}:`, e)
+      }
+
+    } catch (outer) {
+      console.warn(`[WhatsApp Engine] Unexpected error during resolveChatId for ${phoneNumber}:`, outer)
     }
 
-    // Fallback to standard c.us format
+    // Final fallback
+    console.warn(`[WhatsApp Engine] Falling back to ${phoneNumber}@c.us for ${phoneNumber}`)
     return `${phoneNumber}@c.us`
   }
 
