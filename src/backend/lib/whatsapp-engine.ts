@@ -612,6 +612,45 @@ export class WhatsAppEngine {
   }
 
   /**
+   * Normalizes a phone number to WhatsApp chat ID format
+   * Removes special characters and ensures proper format
+   */
+  private normalizePhoneNumber(phone: string): string {
+    // Remove all non-numeric characters except + at the start
+    let normalized = phone.replace(/[^\d+]/g, '')
+    
+    // Remove leading + if present
+    if (normalized.startsWith('+')) {
+      normalized = normalized.substring(1)
+    }
+    
+    // Ensure we have a valid phone number (at least 10 digits)
+    if (normalized.length < 10) {
+      throw new Error(`Invalid phone number format: ${phone}`)
+    }
+    
+    return normalized
+  }
+
+  /**
+   * Checks if a contact exists and is registered on WhatsApp
+   * This helps prevent "No LID for user" errors
+   */
+  private async isRegisteredWhatsAppNumber(chatId: string): Promise<boolean> {
+    try {
+      if (!this.client) return false
+      
+      // Use whatsapp-web.js method to check if number is registered
+      const isRegistered = await this.client.isRegisteredUser(chatId)
+      return isRegistered
+    } catch (error) {
+      console.warn(`[WhatsApp Engine] Error checking if number is registered: ${chatId}`, error)
+      // If we can't check, assume it's registered to avoid blocking sends
+      return true
+    }
+  }
+
+  /**
    * Envia uma mensagem de texto
    */
   async sendMessage(message: WhatsAppMessage): Promise<SendMessageResult> {
@@ -641,11 +680,33 @@ export class WhatsAppEngine {
         return { success: false, error: "Puppeteer page indisponível. Reconectando, tente novamente em alguns segundos." }
       }
 
-      const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
+      // Normalize phone number to prevent format issues
+      let normalizedPhone: string
+      try {
+        normalizedPhone = this.normalizePhoneNumber(message.to)
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Invalid phone number format",
+        }
+      }
+
+      const chatId = normalizedPhone.includes("@c.us") ? normalizedPhone : `${normalizedPhone}@c.us`
+      
+      // Check if the number is registered on WhatsApp to prevent "No LID" errors
+      const isRegistered = await this.isRegisteredWhatsAppNumber(chatId)
+      if (!isRegistered) {
+        console.warn(`[WhatsApp Engine] Number not registered on WhatsApp: ${normalizedPhone}`)
+        return {
+          success: false,
+          error: `Number ${normalizedPhone} is not registered on WhatsApp`,
+        }
+      }
+
       const result = await this.client.sendMessage(chatId, message.content)
       
       console.log(
-        `[WhatsApp Engine] Message sent to ${message.to}: ${message.content.substring(0, 50)}...`
+        `[WhatsApp Engine] Message sent to ${normalizedPhone}: ${message.content.substring(0, 50)}...`
       )
 
       return {
@@ -653,10 +714,20 @@ export class WhatsAppEngine {
         messageId: result.id._serialized,
       }
     } catch (error) {
-  console.error(`[WhatsApp Engine] Send message error:`, error)
+      console.error(`[WhatsApp Engine] Send message error:`, error)
 
       // Detect common puppeteer/page null errors coming from whatsapp-web.js
       const msg = error instanceof Error ? error.message : String(error)
+      
+      // Handle "No LID for user" error specifically
+      if (msg.includes("No LID for user") || msg.includes("LID")) {
+        console.error(`[WhatsApp Engine] LID error for ${message.to}. This usually means the contact info hasn't synced properly.`)
+        return {
+          success: false,
+          error: "Contact not found in WhatsApp. The number might not be registered or the session needs to refresh contacts. Please try again in a few moments.",
+        }
+      }
+      
       if (msg.includes("reading 'evaluate'") || msg.includes("Cannot read properties of null") || msg.includes('evaluate')) {
         // Mark session as disconnected and schedule a reconnect
         try {
@@ -707,11 +778,33 @@ export class WhatsAppEngine {
     }
 
     try {
+      // Normalize phone number to prevent format issues
+      let normalizedPhone: string
+      try {
+        normalizedPhone = this.normalizePhoneNumber(message.to)
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Invalid phone number format",
+        }
+      }
+
+      const chatId = normalizedPhone.includes("@c.us") ? normalizedPhone : `${normalizedPhone}@c.us`
+      
+      // Check if the number is registered on WhatsApp to prevent "No LID" errors
+      const isRegistered = await this.isRegisteredWhatsAppNumber(chatId)
+      if (!isRegistered) {
+        console.warn(`[WhatsApp Engine] Number not registered on WhatsApp: ${normalizedPhone}`)
+        return {
+          success: false,
+          error: `Number ${normalizedPhone} is not registered on WhatsApp`,
+        }
+      }
+
       const media = await MessageMedia.fromUrl(message.mediaUrl)
-      const chatId = message.to.includes("@c.us") ? message.to : `${message.to}@c.us`
       const result = await this.client.sendMessage(chatId, media, { caption: message.content })
       
-      console.log(`[WhatsApp Engine] Media sent to ${message.to}`)
+      console.log(`[WhatsApp Engine] Media sent to ${normalizedPhone}`)
 
       return {
         success: true,
@@ -720,6 +813,16 @@ export class WhatsAppEngine {
     } catch (error) {
       console.error(`[WhatsApp Engine] Send media error:`, error)
       const msg = error instanceof Error ? error.message : String(error)
+      
+      // Handle "No LID for user" error specifically
+      if (msg.includes("No LID for user") || msg.includes("LID")) {
+        console.error(`[WhatsApp Engine] LID error for ${message.to}. This usually means the contact info hasn't synced properly.`)
+        return {
+          success: false,
+          error: "Contact not found in WhatsApp. The number might not be registered or the session needs to refresh contacts. Please try again in a few moments.",
+        }
+      }
+      
       if (msg.includes("reading 'evaluate'") || msg.includes("Cannot read properties of null") || msg.includes('evaluate')) {
         try {
           this.status = "disconnected"
