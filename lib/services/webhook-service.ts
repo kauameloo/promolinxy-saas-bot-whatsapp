@@ -64,23 +64,32 @@ export class WebhookService {
    * Processa evento específico
    */
   private async handleEvent(payload: CaktoWebhookPayload): Promise<void> {
-    // Cria ou atualiza cliente
-    const customer = await this.customerService.findOrCreateFromWebhook(payload)
+    // Cria ou atualiza cliente (se dados disponíveis)
+    let customer = null
+    let customerId = null
+    
+    if (payload.customer?.phone?.trim()) {
+      customer = await this.customerService.findOrCreateFromWebhook(payload)
+      customerId = customer.id
+    }
 
     // Cria ou atualiza pedido
-    const order = await this.orderService.createFromWebhook(payload, customer.id)
-
-    // Busca fluxos ativos para este evento
-    const flows = await this.flowService.findActiveByEventType(payload.event)
+    const order = await this.orderService.createFromWebhook(payload, customerId)
 
     // Se evento de aprovação, cancela mensagens pendentes
     if (payload.event === "purchase_approved") {
       await this.messageService.cancelOrderMessages(order.id)
     }
 
-    // Agenda mensagens dos fluxos
-    for (const flow of flows) {
-      await this.messageService.scheduleFlowMessages(flow, customer, order)
+    // Agenda mensagens dos fluxos apenas se temos customer com telefone
+    if (customer) {
+      // Busca fluxos ativos para este evento
+      const flows = await this.flowService.findActiveByEventType(payload.event)
+
+      // Agenda mensagens dos fluxos
+      for (const flow of flows) {
+        await this.messageService.scheduleFlowMessages(flow, customer, order)
+      }
     }
   }
 
