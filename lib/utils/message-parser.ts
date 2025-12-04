@@ -91,3 +91,10 @@ export function formatDate(date: Date | string): string {
     minute: "2-digit",
   }).format(d)
 }
+
+/**
+ * Extrai código PIX do payload (aceita pix_code ou pix_qrcode)
+ */
+export function getPixCode(payment?: { pix_code?: string; pix_qrcode?: string }): string | undefined {
+  return payment?.pix_code || payment?.pix_qrcode
+}

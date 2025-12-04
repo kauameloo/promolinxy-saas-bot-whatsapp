@@ -35,23 +35,19 @@ export class CustomerService {
       console.log(`Customer found: ${customer.name} (${customer.id})`)
       
       // Atualiza dados se necessário (mantém dados mais completos)
-      const shouldUpdate =
-        (customerData.name && customerData.name !== customer.name) ||
-        (customerData.email && customerData.email !== customer.email) ||
-        (customerData.document && customerData.document !== customer.document)
+      // Só atualiza se o novo valor é válido (não vazio) E diferente do atual
+      const shouldUpdateName = customerData.name && customerData.name.trim() !== "" && customerData.name !== customer.name
+      const shouldUpdateEmail = customerData.email && customerData.email.trim() !== "" && customerData.email !== customer.email
+      const shouldUpdateDocument = customerData.document && customerData.document.trim() !== "" && customerData.document !== customer.document
 
-      if (shouldUpdate) {
-        console.log("Updating customer with new data:", {
-          name: customerData.name || customer.name,
-          email: customerData.email || customer.email,
-          document: customerData.document || customer.document,
-        })
+      if (shouldUpdateName || shouldUpdateEmail || shouldUpdateDocument) {
+        const updateData: Record<string, string> = {}
+        if (shouldUpdateName) updateData.name = customerData.name
+        if (shouldUpdateEmail) updateData.email = customerData.email
+        if (shouldUpdateDocument) updateData.document = customerData.document
         
-        customer = await update<Customer>("customers", customer.id, {
-          name: customerData.name || customer.name,
-          email: customerData.email || customer.email,
-          document: customerData.document || customer.document,
-        })
+        console.log("Updating customer with new data:", updateData)
+        customer = await update<Customer>("customers", customer.id, updateData)
         console.log("✓ Customer updated successfully")
       }
       return customer!

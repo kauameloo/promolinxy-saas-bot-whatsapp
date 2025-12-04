@@ -4,6 +4,7 @@
 
 import { query, queryOne, insert, update } from "@/lib/db"
 import type { Order, CaktoWebhookPayload, OrderStatus } from "@/lib/types"
+import { getPixCode } from "@/lib/utils/message-parser"
 
 export class OrderService {
   private tenantId: string
@@ -41,7 +42,7 @@ export class OrderService {
       status,
       payment_method: payload.payment?.method,
       payment_url: payload.payment?.checkout_url,
-      pix_code: payload.payment?.pix_code || payload.payment?.pix_qrcode,
+      pix_code: getPixCode(payload.payment),
       boleto_url: payload.payment?.boleto_url,
       checkout_url: payload.payment?.checkout_url,
       metadata: JSON.stringify({
@@ -52,10 +53,8 @@ export class OrderService {
       }),
     }
 
-    console.log("Creating new order:", {
-      ...orderData,
-      metadata: "..." // Don't log full metadata
-    })
+    const { metadata, ...logData } = orderData
+    console.log("Creating new order:", logData)
     
     const order = await insert<Order>("orders", orderData)
     console.log(`✓ New order created: ${order.id}`)
@@ -72,7 +71,7 @@ export class OrderService {
     const updateData = {
       status,
       payment_method: payload.payment?.method,
-      pix_code: payload.payment?.pix_code || payload.payment?.pix_qrcode,
+      pix_code: getPixCode(payload.payment),
       boleto_url: payload.payment?.boleto_url,
       payment_url: payload.payment?.checkout_url,
       checkout_url: payload.payment?.checkout_url,
@@ -84,10 +83,8 @@ export class OrderService {
       }),
     }
 
-    console.log(`Updating order ${id} with:`, {
-      ...updateData,
-      metadata: "..." // Don't log full metadata
-    })
+    const { metadata, ...logData } = updateData
+    console.log(`Updating order ${id} with:`, logData)
 
     const updated = await update<Order>("orders", id, updateData)
     console.log("✓ Order updated successfully")
