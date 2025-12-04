@@ -28,6 +28,16 @@ export class WebhookService {
    * Processa webhook da Cakto
    */
   async processWebhook(payload: CaktoWebhookPayload): Promise<WebhookEvent> {
+    // Log detalhado do payload recebido para debugging
+    console.log("=== CAKTO WEBHOOK RECEIVED ===")
+    console.log("Event Type:", payload.event)
+    console.log("Transaction ID:", payload.transaction_id || "N/A")
+    console.log("Customer Data:", JSON.stringify(payload.customer, null, 2))
+    console.log("Product Data:", JSON.stringify(payload.product, null, 2))
+    console.log("Payment Data:", JSON.stringify(payload.payment, null, 2))
+    console.log("Metadata:", JSON.stringify(payload.metadata, null, 2))
+    console.log("==============================")
+
     // Registra o evento
     const event = await insert<WebhookEvent>("webhook_events", {
       tenant_id: this.tenantId,
@@ -48,9 +58,11 @@ export class WebhookService {
         processed_at: new Date().toISOString(),
       })
 
+      console.log(`✓ Webhook ${event.id} processed successfully`)
       return { ...event, processed: true }
     } catch (error) {
       // Registra erro
+      console.error(`✗ Webhook ${event.id} processing failed:`, error)
       await update("webhook_events", event.id, {
         error_message: error instanceof Error ? error.message : "Unknown error",
         retry_count: event.retry_count + 1,
@@ -69,15 +81,34 @@ export class WebhookService {
     let customerId = null
     
     if (payload.customer?.phone?.trim()) {
+      console.log("Creating/updating customer with data:", {
+        name: payload.customer.name,
+        email: payload.customer.email,
+        phone: payload.customer.phone,
+        document: payload.customer.document,
+      })
       customer = await this.customerService.findOrCreateFromWebhook(payload)
       customerId = customer.id
+      console.log(`✓ Customer processed: ${customer.name} (${customer.id})`)
+    } else {
+      console.warn("⚠ No customer phone found in webhook payload - skipping customer creation")
     }
 
     // Cria ou atualiza pedido
+    console.log("Creating/updating order with data:", {
+      transaction_id: payload.transaction_id,
+      product_name: payload.product?.name,
+      product_id: payload.product?.id,
+      amount: payload.payment?.amount || payload.product?.price,
+      payment_method: payload.payment?.method,
+      event: payload.event,
+    })
     const order = await this.orderService.createFromWebhook(payload, customerId)
+    console.log(`✓ Order processed: ${order.id}`)
 
     // Se evento de aprovação, cancela mensagens pendentes
     if (payload.event === "purchase_approved") {
+      console.log("Purchase approved - canceling pending messages")
       await this.messageService.cancelOrderMessages(order.id)
     }
 
@@ -85,11 +116,15 @@ export class WebhookService {
     if (customer) {
       // Busca fluxos ativos para este evento
       const flows = await this.flowService.findActiveByEventType(payload.event)
+      console.log(`Found ${flows.length} active flow(s) for event ${payload.event}`)
 
       // Agenda mensagens dos fluxos
       for (const flow of flows) {
-        await this.messageService.scheduleFlowMessages(flow, customer, order)
+        const scheduled = await this.messageService.scheduleFlowMessages(flow, customer, order)
+        console.log(`✓ Scheduled ${scheduled.length} message(s) from flow "${flow.name}"`)
       }
+    } else {
+      console.warn("⚠ No customer available - skipping message scheduling")
     }
   }
 

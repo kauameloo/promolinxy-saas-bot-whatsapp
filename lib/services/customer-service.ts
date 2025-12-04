@@ -23,6 +23,7 @@ export class CustomerService {
 
     // Normaliza o telefone
     const phone = customerData.phone.replace(/\D/g, "")
+    console.log(`Looking up customer by phone: ${phone}`)
 
     // Tenta encontrar pelo telefone
     let customer = await queryOne<Customer>(`SELECT * FROM customers WHERE tenant_id = $1 AND phone = $2`, [
@@ -31,19 +32,33 @@ export class CustomerService {
     ])
 
     if (customer) {
-      // Atualiza dados se necessário
-      if (customerData.name !== customer.name || customerData.email !== customer.email) {
+      console.log(`Customer found: ${customer.name} (${customer.id})`)
+      
+      // Atualiza dados se necessário (mantém dados mais completos)
+      const shouldUpdate =
+        (customerData.name && customerData.name !== customer.name) ||
+        (customerData.email && customerData.email !== customer.email) ||
+        (customerData.document && customerData.document !== customer.document)
+
+      if (shouldUpdate) {
+        console.log("Updating customer with new data:", {
+          name: customerData.name || customer.name,
+          email: customerData.email || customer.email,
+          document: customerData.document || customer.document,
+        })
+        
         customer = await update<Customer>("customers", customer.id, {
           name: customerData.name || customer.name,
           email: customerData.email || customer.email,
           document: customerData.document || customer.document,
         })
+        console.log("✓ Customer updated successfully")
       }
       return customer!
     }
 
     // Cria novo cliente
-    customer = await insert<Customer>("customers", {
+    const newCustomerData = {
       tenant_id: this.tenantId,
       name: customerData.name || "Cliente",
       email: customerData.email,
@@ -51,7 +66,11 @@ export class CustomerService {
       document: customerData.document,
       metadata: {},
       tags: JSON.stringify([]),
-    })
+    }
+    
+    console.log("Creating new customer:", newCustomerData)
+    customer = await insert<Customer>("customers", newCustomerData)
+    console.log(`✓ New customer created: ${customer.name} (${customer.id})`)
 
     return customer
   }

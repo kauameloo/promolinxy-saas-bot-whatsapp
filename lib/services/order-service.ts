@@ -22,6 +22,7 @@ export class OrderService {
     if (externalId) {
       const existing = await this.findByExternalId(externalId)
       if (existing) {
+        console.log(`Order found by transaction_id ${externalId}, updating...`)
         return this.updateFromWebhook(existing.id, payload)
       }
     }
@@ -29,8 +30,8 @@ export class OrderService {
     // Determina o status baseado no evento
     const status = this.getStatusFromEvent(payload.event)
 
-    // Cria novo pedido
-    const order = await insert<Order>("orders", {
+    // Cria novo pedido com todos os dados disponíveis
+    const orderData = {
       tenant_id: this.tenantId,
       customer_id: customerId,
       external_id: externalId,
@@ -40,11 +41,24 @@ export class OrderService {
       status,
       payment_method: payload.payment?.method,
       payment_url: payload.payment?.checkout_url,
-      pix_code: payload.payment?.pix_code,
+      pix_code: payload.payment?.pix_code || payload.payment?.pix_qrcode,
       boleto_url: payload.payment?.boleto_url,
       checkout_url: payload.payment?.checkout_url,
-      metadata: JSON.stringify(payload.metadata || {}),
+      metadata: JSON.stringify({
+        ...(payload.metadata || {}),
+        payment_status: payload.payment?.status,
+        event_type: payload.event,
+        timestamp: payload.timestamp,
+      }),
+    }
+
+    console.log("Creating new order:", {
+      ...orderData,
+      metadata: "..." // Don't log full metadata
     })
+    
+    const order = await insert<Order>("orders", orderData)
+    console.log(`✓ New order created: ${order.id}`)
 
     return order
   }
@@ -55,13 +69,28 @@ export class OrderService {
   async updateFromWebhook(id: string, payload: CaktoWebhookPayload): Promise<Order> {
     const status = this.getStatusFromEvent(payload.event)
 
-    const updated = await update<Order>("orders", id, {
+    const updateData = {
       status,
       payment_method: payload.payment?.method,
-      pix_code: payload.payment?.pix_code,
+      pix_code: payload.payment?.pix_code || payload.payment?.pix_qrcode,
       boleto_url: payload.payment?.boleto_url,
-      metadata: JSON.stringify(payload.metadata || {}),
+      payment_url: payload.payment?.checkout_url,
+      checkout_url: payload.payment?.checkout_url,
+      metadata: JSON.stringify({
+        ...(payload.metadata || {}),
+        payment_status: payload.payment?.status,
+        event_type: payload.event,
+        timestamp: payload.timestamp,
+      }),
+    }
+
+    console.log(`Updating order ${id} with:`, {
+      ...updateData,
+      metadata: "..." // Don't log full metadata
     })
+
+    const updated = await update<Order>("orders", id, updateData)
+    console.log("✓ Order updated successfully")
 
     return updated!
   }
