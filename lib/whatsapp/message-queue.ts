@@ -72,15 +72,24 @@ export class MessageQueue {
     }
 
     try {
-      // Busca mensagens prontas para envio
+      // Atomically claim a batch of pending messages to avoid duplicate processing
+      // Uses a FOR UPDATE SKIP LOCKED selection inside a CTE and updates their status to 'processing'
       const messages = await query<ScheduledMessage>(
-        `SELECT * FROM scheduled_messages 
-         WHERE tenant_id = $1 
-         AND status = 'pending' 
-         AND scheduled_for <= NOW()
-         AND attempts < $2
-         ORDER BY scheduled_for
-         LIMIT $3`,
+        `WITH cte AS (
+           SELECT id FROM scheduled_messages
+           WHERE tenant_id = $1
+             AND status = 'pending'
+             AND scheduled_for <= NOW()
+             AND attempts < $2
+           ORDER BY scheduled_for
+           LIMIT $3
+           FOR UPDATE SKIP LOCKED
+         )
+         UPDATE scheduled_messages
+         SET status = 'processing', last_attempt = NOW()
+         FROM cte
+         WHERE scheduled_messages.id = cte.id
+         RETURNING scheduled_messages.*;`,
         [this.tenantId, this.config.maxRetries, this.config.batchSize],
       )
 
@@ -108,6 +117,27 @@ export class MessageQueue {
         status: "processing",
         last_attempt: new Date().toISOString(),
       })
+
+      // Dedupe: se já houve uma mensagem idêntica enviada pro mesmo telefone nos últimos 2 minutos, não reenviamos
+      try {
+        const dup = await query(
+          `SELECT 1 FROM message_logs WHERE tenant_id = $1 AND phone = $2 AND message_content = $3 AND status = 'sent' AND sent_at >= NOW() - INTERVAL '2 minutes' LIMIT 1`,
+          [this.tenantId, message.phone, message.message_content]
+        )
+
+        if (dup && dup.length > 0) {
+          // marca como enviada para não tentar novamente
+          await update("scheduled_messages", message.id, {
+            status: "sent",
+            attempts: message.attempts + 1,
+          })
+          await this.logMessage(message, "sent")
+          console.log(`[Message Queue] Message ${message.id} skipped (duplicate detected)`)
+          return
+        }
+      } catch (e) {
+        console.warn(`[Message Queue] Dedupe check failed for ${message.id}:`, e)
+      }
 
       // Envia a mensagem
       const result = await this.engine.sendMessage({
@@ -169,7 +199,7 @@ export class MessageQueue {
         status,
         status === "sent" ? new Date().toISOString() : null,
         errorMessage,
-        JSON.stringify({}),
+        JSON.stringify({ processor: "inproc" }),
       ],
     )
   }

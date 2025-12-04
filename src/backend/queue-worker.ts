@@ -104,6 +104,26 @@ async function processMessage(message: ScheduledMessage): Promise<void> {
     })
 
     // Send the message via WhatsApp server
+    // Dedupe check: avoid re-sending identical message_content to same phone within short window
+    try {
+      const dupRows = await query(
+        `SELECT 1 FROM message_logs WHERE tenant_id = $1 AND phone = $2 AND message_content = $3 AND status = 'sent' AND sent_at >= NOW() - INTERVAL '2 minutes' LIMIT 1`,
+        [message.tenant_id, message.phone, message.message_content]
+      )
+      if (dupRows && dupRows.length > 0) {
+        await update("scheduled_messages", message.id, {
+          status: "sent",
+          attempts: message.attempts + 1,
+          last_attempt: new Date().toISOString(),
+        })
+        await logMessage(message, "sent")
+        console.log(`[Queue Worker] Message ${message.id} skipped (duplicate detected)`)
+        return
+      }
+    } catch (e) {
+      console.warn(`[Queue Worker] Dedupe check failed for ${message.id}:`, e)
+    }
+
     const result = await sendMessageViaServer(
       message.tenant_id,
       message.phone,
@@ -167,7 +187,7 @@ async function logMessage(
       status,
       status === "sent" ? new Date().toISOString() : null,
       errorMessage,
-      JSON.stringify({}),
+      JSON.stringify({ processor: "worker", scheduled_message_id: message.id }),
     ]
   )
 }
@@ -189,15 +209,23 @@ async function processNextBatch(): Promise<void> {
 
     const tenantIds = activeTenants.map((t) => t.tenant_id)
 
-    // Fetch pending messages for active tenants
+    // Atomically claim a batch of pending messages across active tenants to avoid duplicate processing
     const messages = await query<ScheduledMessage>(
-      `SELECT * FROM scheduled_messages 
-       WHERE tenant_id = ANY($1)
-       AND status = 'pending' 
-       AND scheduled_for <= NOW()
-       AND attempts < $2
-       ORDER BY scheduled_for
-       LIMIT $3`,
+      `WITH cte AS (
+         SELECT id FROM scheduled_messages
+         WHERE tenant_id = ANY($1)
+           AND status = 'pending'
+           AND scheduled_for <= NOW()
+           AND attempts < $2
+         ORDER BY scheduled_for
+         FOR UPDATE SKIP LOCKED
+         LIMIT $3
+       )
+       UPDATE scheduled_messages
+       SET status = 'processing', last_attempt = NOW()
+       FROM cte
+       WHERE scheduled_messages.id = cte.id
+       RETURNING scheduled_messages.*;`,
       [tenantIds, DEFAULT_CONFIG.maxRetries, DEFAULT_CONFIG.batchSize]
     )
 
