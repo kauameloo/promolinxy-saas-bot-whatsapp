@@ -2,20 +2,20 @@
 // FLOW DETAIL PAGE - Detalhes e edição de fluxo
 // =====================================================
 
-"use client"
+"use client";
 
-import { useState, use } from "react"
-import { useRouter } from "next/navigation"
-import { Header } from "@/components/dashboard/header"
-import { useApi, apiPost, apiPut, apiDelete } from "@/lib/hooks/use-api"
-import { useAuth } from "@/lib/hooks/use-auth"
-import type { MessageFlow, FlowMessage, CaktoEventType } from "@/lib/types"
-import { EVENT_LABELS } from "@/lib/constants/default-flows"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
+import { useState, use, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Header } from "@/components/dashboard/header";
+import { useApi, apiPost, apiPut, apiDelete } from "@/lib/hooks/use-api";
+import { useAuth } from "@/lib/hooks/use-auth";
+import type { MessageFlow, FlowMessage, CaktoEventType } from "@/lib/types";
+import { EVENT_LABELS } from "@/lib/constants/default-flows";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,11 +34,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { ArrowLeft, Plus, Loader2, Trash2, Clock, GripVertical, Save, Pencil, Copy, Eye, Webhook, CheckCircle } from "lucide-react"
-import Link from "next/link"
-import { mutate } from "swr"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/alert-dialog";
+import {
+  ArrowLeft,
+  Plus,
+  Loader2,
+  Trash2,
+  Clock,
+  GripVertical,
+  Save,
+  Pencil,
+  Copy,
+  Eye,
+  Webhook,
+  CheckCircle,
+} from "lucide-react";
+import Link from "next/link";
+import { mutate } from "swr";
+import { cn } from "@/lib/utils";
 
 function MessagePreview({ content }: { content: string }) {
   const previewData = {
@@ -49,19 +62,21 @@ function MessagePreview({ content }: { content: string }) {
     qr_code: "00020126580014BR.GOV.BCB.PIX...",
     link_checkout: "https://exemplo.com/checkout/abc",
     codigo_rastreio: "BR123456789BR",
-  }
+  };
 
-  let preview = content
+  let preview = content;
   Object.entries(previewData).forEach(([key, value]) => {
-    preview = preview.replace(new RegExp(`{{${key}}}`, "g"), value)
-  })
+    preview = preview.replace(new RegExp(`{{${key}}}`, "g"), value);
+  });
 
   return (
     <div className="rounded-lg bg-emerald-500/10 p-4">
-      <p className="mb-2 text-xs font-medium text-emerald-600">Preview da mensagem:</p>
+      <p className="mb-2 text-xs font-medium text-emerald-600">
+        Preview da mensagem:
+      </p>
       <p className="whitespace-pre-wrap text-sm">{preview}</p>
     </div>
-  )
+  );
 }
 
 function MessageItem({
@@ -70,46 +85,56 @@ function MessageItem({
   flowId,
   token,
   onUpdate,
+  onDragStart,
+  onDragOver,
+  onDrop,
 }: {
-  message: FlowMessage
-  index: number
-  flowId: string
-  token: string | null
-  onUpdate: () => void
+  message: FlowMessage;
+  index: number;
+  flowId: string;
+  token: string | null;
+  onUpdate: () => void;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
+  onDragOver: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
+  onDrop: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [editData, setEditData] = useState({
     content: message.content,
     delay_minutes: message.delay_minutes,
-  })
+  });
 
   const handleSave = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      await apiPut(`/api/flows/${flowId}/messages/${message.id}`, editData, token)
-      onUpdate()
-      setIsEditing(false)
+      await apiPut(
+        `/api/flows/${flowId}/messages/${message.id}`,
+        editData,
+        token
+      );
+      onUpdate();
+      setIsEditing(false);
     } catch (error) {
-      console.error("Error updating message:", error)
+      console.error("Error updating message:", error);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleDelete = async () => {
-    setIsDeleting(true)
+    setIsDeleting(true);
     try {
-      await apiDelete(`/api/flows/${flowId}/messages/${message.id}`, token)
-      onUpdate()
+      await apiDelete(`/api/flows/${flowId}/messages/${message.id}`, token);
+      onUpdate();
     } catch (error) {
-      console.error("Error deleting message:", error)
+      console.error("Error deleting message:", error);
     } finally {
-      setIsDeleting(false)
+      setIsDeleting(false);
     }
-  }
+  };
 
   if (isEditing) {
     return (
@@ -120,7 +145,9 @@ function MessageItem({
             <Textarea
               rows={6}
               value={editData.content}
-              onChange={(e) => setEditData({ ...editData, content: e.target.value })}
+              onChange={(e) =>
+                setEditData({ ...editData, content: e.target.value })
+              }
             />
           </div>
           <div className="space-y-2">
@@ -129,25 +156,44 @@ function MessageItem({
               type="number"
               min={0}
               value={editData.delay_minutes}
-              onChange={(e) => setEditData({ ...editData, delay_minutes: Number.parseInt(e.target.value) || 0 })}
+              onChange={(e) =>
+                setEditData({
+                  ...editData,
+                  delay_minutes: Number.parseInt(e.target.value) || 0,
+                })
+              }
             />
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={handleSave} disabled={isSaving} size="sm">
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
               Salvar
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(false)}
+            >
               Cancelar
             </Button>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="group rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/30">
+    <div
+      className="group rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/30"
+      draggable
+      onDragStart={(e) => onDragStart(e, index)}
+      onDragOver={(e) => onDragOver(e, index)}
+      onDrop={(e) => onDrop(e, index)}
+    >
       <div className="flex gap-4">
         <div className="flex items-start">
           <GripVertical className="h-5 w-5 cursor-move text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
@@ -163,11 +209,18 @@ function MessageItem({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              {message.delay_minutes === 0 ? "Envio imediato" : `${message.delay_minutes} min após anterior`}
+              {message.delay_minutes === 0
+                ? "Envio imediato"
+                : `${message.delay_minutes} min após anterior`}
             </div>
 
             <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setShowPreview(!showPreview)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setShowPreview(!showPreview)}
+              >
                 <Eye className={cn("h-4 w-4", showPreview && "text-primary")} />
               </Button>
               <Button
@@ -178,24 +231,40 @@ function MessageItem({
               >
                 <Copy className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditing(true)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setIsEditing(true)}
+              >
                 <Pencil className="h-4 w-4" />
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
-                    <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
-                      {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
                       Excluir
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -206,51 +275,55 @@ function MessageItem({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function WebhookUrlSection({ eventType }: { eventType: CaktoEventType }) {
-  const [copied, setCopied] = useState(false)
-  
+  const [copied, setCopied] = useState(false);
+
   // Generate webhook URL for this specific event type
-  const webhookUrl = typeof window !== "undefined" 
-    ? `${window.location.origin}/api/webhooks/cakto/${eventType}`
-    : `/api/webhooks/cakto/${eventType}`
+  const webhookUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/webhooks/cakto/${eventType}`
+      : `/api/webhooks/cakto/${eventType}`;
 
   const handleCopyUrl = () => {
-    navigator.clipboard.writeText(webhookUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Helper function to generate payment method and extra fields based on event type
   const getPaymentExample = () => {
-    if (eventType.includes('pix')) {
+    if (eventType.includes("pix")) {
       return {
-        method: 'pix',
-        extraFields: '"pix_code": "00020126...",\n    "pix_qrcode": "https://exemplo.com/qr.png"'
-      }
+        method: "pix",
+        extraFields:
+          '"pix_code": "00020126...",\n    "pix_qrcode": "https://exemplo.com/qr.png"',
+      };
     }
-    if (eventType.includes('boleto')) {
+    if (eventType.includes("boleto")) {
       return {
-        method: 'boleto',
-        extraFields: '"boleto_url": "https://exemplo.com/boleto/123"'
-      }
+        method: "boleto",
+        extraFields: '"boleto_url": "https://exemplo.com/boleto/123"',
+      };
     }
-    if (eventType.includes('picpay')) {
+    if (eventType.includes("picpay")) {
       return {
-        method: 'picpay',
-        extraFields: '"checkout_url": "https://picpay.me/exemplo"'
-      }
+        method: "picpay",
+        extraFields: '"checkout_url": "https://picpay.me/exemplo"',
+      };
     }
     return {
-      method: 'credit_card',
-      extraFields: ''
-    }
-  }
+      method: "credit_card",
+      extraFields: "",
+    };
+  };
 
-  const payment = getPaymentExample()
-  const paymentFieldsJson = payment.extraFields ? `,\n    ${payment.extraFields}` : ''
+  const payment = getPaymentExample();
+  const paymentFieldsJson = payment.extraFields
+    ? `,\n    ${payment.extraFields}`
+    : "";
 
   return (
     <div className="mb-6 rounded-xl border border-border bg-card p-6">
@@ -262,27 +335,28 @@ function WebhookUrlSection({ eventType }: { eventType: CaktoEventType }) {
         <div className="space-y-2">
           <Label className="text-muted-foreground">URL do Webhook</Label>
           <div className="flex gap-2">
-            <Input
-              readOnly
-              value={webhookUrl}
-              className="font-mono text-sm"
-            />
+            <Input readOnly value={webhookUrl} className="font-mono text-sm" />
             <Button variant="outline" onClick={handleCopyUrl}>
-              {copied ? <CheckCircle className="h-4 w-4 text-green-500 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+              {copied ? (
+                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+              ) : (
+                <Copy className="h-4 w-4 mr-2" />
+              )}
               {copied ? "Copiado" : "Copiar"}
             </Button>
           </div>
         </div>
         <div className="rounded-lg bg-blue-500/10 p-4">
           <p className="text-sm text-blue-600">
-            <strong>Instruções:</strong> Configure esta URL na plataforma Cakto para o evento <strong>{EVENT_LABELS[eventType]}</strong>.
-            Cada tipo de evento tem sua própria URL de webhook.
+            <strong>Instruções:</strong> Configure esta URL na plataforma Cakto
+            para o evento <strong>{EVENT_LABELS[eventType]}</strong>. Cada tipo
+            de evento tem sua própria URL de webhook.
           </p>
         </div>
         <div className="space-y-2">
           <Label className="text-muted-foreground">Exemplo de Payload</Label>
           <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto">
-{`POST ${webhookUrl}
+            {`POST ${webhookUrl}
 Content-Type: application/json
 
 {
@@ -306,64 +380,110 @@ Content-Type: application/json
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default function FlowDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
-  const { data: flow, isLoading } = useApi<MessageFlow>(`/api/flows/${id}`)
-  const { token } = useAuth()
-  const router = useRouter()
+export default function FlowDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const { data: flow, isLoading } = useApi<MessageFlow>(`/api/flows/${id}`);
+  const { token } = useAuth();
+  const router = useRouter();
 
-  const [isAddingMessage, setIsAddingMessage] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
+  const [isAddingMessage, setIsAddingMessage] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [newMessage, setNewMessage] = useState({
     content: "",
     delay_minutes: 0,
-  })
+  });
 
   const handleToggleActive = async () => {
-    if (!flow) return
-    setIsSaving(true)
+    if (!flow) return;
+    setIsSaving(true);
     try {
-      await apiPut(`/api/flows/${id}`, { is_active: !flow.is_active }, token)
-      mutate([`/api/flows/${id}`, token])
+      await apiPut(`/api/flows/${id}`, { is_active: !flow.is_active }, token);
+      mutate([`/api/flows/${id}`, token]);
     } catch (error) {
-      console.error("Error toggling flow:", error)
+      console.error("Error toggling flow:", error);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleAddMessage = async () => {
-    if (!newMessage.content) return
-    setIsAddingMessage(true)
+    if (!newMessage.content) return;
+    setIsAddingMessage(true);
     try {
-      await apiPost(`/api/flows/${id}/messages`, newMessage, token)
-      mutate([`/api/flows/${id}`, token])
-      setDialogOpen(false)
-      setNewMessage({ content: "", delay_minutes: 0 })
+      await apiPost(`/api/flows/${id}/messages`, newMessage, token);
+      mutate([`/api/flows/${id}`, token]);
+      setDialogOpen(false);
+      setNewMessage({ content: "", delay_minutes: 0 });
     } catch (error) {
-      console.error("Error adding message:", error)
+      console.error("Error adding message:", error);
     } finally {
-      setIsAddingMessage(false)
+      setIsAddingMessage(false);
     }
-  }
+  };
 
   const handleDeleteFlow = async () => {
     try {
-      await apiDelete(`/api/flows/${id}`, token)
-      router.push("/dashboard/flows")
+      await apiDelete(`/api/flows/${id}`, token);
+      router.push("/dashboard/flows");
     } catch (error) {
-      console.error("Error deleting flow:", error)
+      console.error("Error deleting flow:", error);
     }
-  }
+  };
 
   const handleUpdateMessages = () => {
-    mutate([`/api/flows/${id}`, token])
-  }
+    mutate([`/api/flows/${id}`, token]);
+  };
+
+  // Drag-and-drop state for message reordering
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const messages = flow?.messages || [];
+  const [localOrder, setLocalOrder] = useState<FlowMessage[]>(messages);
+
+  // Keep localOrder in sync when flow changes
+  useEffect(() => {
+    setLocalOrder(flow?.messages || []);
+  }, [flow?.messages]);
+
+  const onDragStart = (_e: React.DragEvent<HTMLDivElement>, index: number) => {
+    setDragIndex(index);
+  };
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === index) return;
+    const updated = [...localOrder];
+    const [moved] = updated.splice(dragIndex, 1);
+    updated.splice(index, 0, moved);
+    setLocalOrder(updated);
+    setDragIndex(index);
+  };
+  const onDrop = async (
+    _e: React.DragEvent<HTMLDivElement>,
+    _index: number
+  ) => {
+    setDragIndex(null);
+    // Persist new order to backend
+    try {
+      const ids = localOrder.map((m) => m.id);
+      await apiPost(
+        `/api/flows/${id}/messages/reorder`,
+        { messageIds: ids },
+        token
+      );
+      // Refresh
+      mutate([`/api/flows/${id}`, token]);
+    } catch (error) {
+      console.error("Error reordering messages:", error);
+    }
+  };
 
   const messageTemplates = [
     {
@@ -400,14 +520,14 @@ Finalize agora: {{link_checkout}}
 
 Posso te ajudar com alguma dúvida?`,
     },
-  ]
+  ];
 
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
-    )
+    );
   }
 
   if (!flow) {
@@ -418,7 +538,7 @@ Posso te ajudar com alguma dúvida?`,
           <Button variant="link">Voltar para fluxos</Button>
         </Link>
       </div>
-    )
+    );
   }
 
   return (
@@ -440,7 +560,12 @@ Posso te ajudar com alguma dúvida?`,
               <Label htmlFor="active" className="text-sm">
                 {flow.is_active ? "Ativo" : "Inativo"}
               </Label>
-              <Switch id="active" checked={flow.is_active} onCheckedChange={handleToggleActive} disabled={isSaving} />
+              <Switch
+                id="active"
+                checked={flow.is_active}
+                onCheckedChange={handleToggleActive}
+                disabled={isSaving}
+              />
             </div>
 
             <AlertDialog>
@@ -454,12 +579,15 @@ Posso te ajudar com alguma dúvida?`,
                 <AlertDialogHeader>
                   <AlertDialogTitle>Excluir fluxo?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Esta ação não pode ser desfeita. Todas as mensagens deste fluxo serão removidas.
+                    Esta ação não pode ser desfeita. Todas as mensagens deste
+                    fluxo serão removidas.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteFlow}>Excluir</AlertDialogAction>
+                  <AlertDialogAction onClick={handleDeleteFlow}>
+                    Excluir
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -493,7 +621,9 @@ Posso te ajudar com alguma dúvida?`,
         {/* Messages */}
         <div className="rounded-xl border border-border bg-card p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Mensagens ({flow.messages?.length || 0})</h3>
+            <h3 className="text-lg font-semibold">
+              Mensagens ({flow.messages?.length || 0})
+            </h3>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
@@ -504,7 +634,10 @@ Posso te ajudar com alguma dúvida?`,
               <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Nova Mensagem</DialogTitle>
-                  <DialogDescription>Crie uma nova mensagem para o fluxo ou use um template pronto.</DialogDescription>
+                  <DialogDescription>
+                    Crie uma nova mensagem para o fluxo ou use um template
+                    pronto.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-6 pt-4">
                   {/* Templates */}
@@ -517,7 +650,12 @@ Posso te ajudar com alguma dúvida?`,
                           variant="outline"
                           size="sm"
                           className="h-auto py-2 text-left bg-transparent"
-                          onClick={() => setNewMessage({ ...newMessage, content: template.content })}
+                          onClick={() =>
+                            setNewMessage({
+                              ...newMessage,
+                              content: template.content,
+                            })
+                          }
                         >
                           {template.name}
                         </Button>
@@ -531,22 +669,40 @@ Posso te ajudar com alguma dúvida?`,
                       placeholder="Use {{nome}}, {{produto}}, {{preco}}, {{link_boleto}}, {{qr_code}}, {{link_checkout}} para personalizar"
                       rows={8}
                       value={newMessage.content}
-                      onChange={(e) => setNewMessage({ ...newMessage, content: e.target.value })}
+                      onChange={(e) =>
+                        setNewMessage({
+                          ...newMessage,
+                          content: e.target.value,
+                        })
+                      }
                     />
                     <div className="flex flex-wrap gap-2">
-                      <p className="text-xs text-muted-foreground">Variáveis:</p>
-                      {["nome", "produto", "preco", "link_boleto", "qr_code", "link_checkout", "codigo_rastreio"].map(
-                        (v) => (
-                          <button
-                            key={v}
-                            type="button"
-                            className="rounded bg-muted px-2 py-0.5 text-xs font-mono hover:bg-muted/80"
-                            onClick={() => setNewMessage({ ...newMessage, content: newMessage.content + `{{${v}}}` })}
-                          >
-                            {`{{${v}}}`}
-                          </button>
-                        ),
-                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Variáveis:
+                      </p>
+                      {[
+                        "nome",
+                        "produto",
+                        "preco",
+                        "link_boleto",
+                        "qr_code",
+                        "link_checkout",
+                        "codigo_rastreio",
+                      ].map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          className="rounded bg-muted px-2 py-0.5 text-xs font-mono hover:bg-muted/80"
+                          onClick={() =>
+                            setNewMessage({
+                              ...newMessage,
+                              content: newMessage.content + `{{${v}}}`,
+                            })
+                          }
+                        >
+                          {`{{${v}}}`}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -554,12 +710,18 @@ Posso te ajudar com alguma dúvida?`,
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label>Preview</Label>
-                        <Button variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowPreview(!showPreview)}
+                        >
                           <Eye className="mr-2 h-4 w-4" />
                           {showPreview ? "Ocultar" : "Mostrar"} Preview
                         </Button>
                       </div>
-                      {showPreview && <MessagePreview content={newMessage.content} />}
+                      {showPreview && (
+                        <MessagePreview content={newMessage.content} />
+                      )}
                     </div>
                   )}
 
@@ -577,7 +739,8 @@ Posso te ajudar com alguma dúvida?`,
                       }
                     />
                     <p className="text-xs text-muted-foreground">
-                      0 = envio imediato, 60 = 1 hora depois, 1440 = 24 horas depois
+                      0 = envio imediato, 60 = 1 hora depois, 1440 = 24 horas
+                      depois
                     </p>
                   </div>
 
@@ -600,25 +763,34 @@ Posso te ajudar com alguma dúvida?`,
 
           {flow.messages?.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <p className="text-muted-foreground">Nenhuma mensagem configurada</p>
-              <p className="text-sm text-muted-foreground">Adicione mensagens para este fluxo</p>
+              <p className="text-muted-foreground">
+                Nenhuma mensagem configurada
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Adicione mensagens para este fluxo
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {flow.messages?.map((message, index) => (
-                <MessageItem
-                  key={message.id}
-                  message={message}
-                  index={index}
-                  flowId={id}
-                  token={token}
-                  onUpdate={handleUpdateMessages}
-                />
-              ))}
+              {(localOrder.length ? localOrder : flow.messages)?.map(
+                (message, index) => (
+                  <MessageItem
+                    key={message.id}
+                    message={message}
+                    index={index}
+                    flowId={id}
+                    token={token}
+                    onUpdate={handleUpdateMessages}
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDrop={onDrop}
+                  />
+                )
+              )}
             </div>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }

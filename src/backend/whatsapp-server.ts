@@ -125,8 +125,10 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
         })
         console.log(`[WhatsApp ${tenantId}] Connected: ${phoneNumber}`)
 
-        // Start message queue for this tenant
-        startMessageQueue(tenantId, engine)
+  // Start message queue for this tenant
+  // Option A: Disable internal MessageQueue to avoid duplicate processing.
+  // The standalone queue-worker is responsible for scheduling.
+  console.log(`[Queue] Internal MessageQueue disabled. Standalone worker will process tenant ${tenantId}`)
       },
       onDisconnected: async (reason: string) => {
         await update("whatsapp_sessions", session!.id, {
@@ -443,7 +445,8 @@ async function initializeActiveConnections(): Promise<void> {
               updated_at: new Date().toISOString(),
             })
             console.log(`[Server] Session ${session.tenant_id} restored successfully`)
-            startMessageQueue(session.tenant_id, engine)
+            // Option A: Disable internal MessageQueue; rely on standalone queue-worker
+            console.log(`[Server] Internal MessageQueue disabled for tenant ${session.tenant_id}.`)
           },
           onDisconnected: async (reason: string) => {
             await update("whatsapp_sessions", session.id, {

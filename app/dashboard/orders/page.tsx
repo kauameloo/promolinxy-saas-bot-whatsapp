@@ -2,15 +2,24 @@
 // ORDERS PAGE - Lista de pedidos
 // =====================================================
 
-"use client"
+"use client";
 
-import { Header } from "@/components/dashboard/header"
-import { useApi } from "@/lib/hooks/use-api"
-import type { Order } from "@/lib/types"
-import { formatDate, formatCurrency } from "@/lib/utils/message-parser"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Loader2, ShoppingCart } from "lucide-react"
+import { Header } from "@/components/dashboard/header";
+import { useApi } from "@/lib/hooks/use-api";
+import type { Order } from "@/lib/types";
+import { formatDate, formatCurrency } from "@/lib/utils/message-parser";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, ShoppingCart } from "lucide-react";
+import { useState } from "react";
+import { OrderDetailsModal } from "@/components/dashboard/order-details";
 
 const statusConfig = {
   pending: { label: "Pendente", variant: "secondary" as const },
@@ -18,12 +27,23 @@ const statusConfig = {
   refused: { label: "Recusado", variant: "destructive" as const },
   refunded: { label: "Reembolsado", variant: "outline" as const },
   cancelled: { label: "Cancelado", variant: "secondary" as const },
-}
+};
 
 export default function OrdersPage() {
-  const { data, isLoading } = useApi<{ data: Order[]; pagination: { total: number } }>("/api/orders?limit=50")
+  const { data, isLoading } = useApi<{
+    data: Order[];
+    pagination: { total: number };
+  }>("/api/orders?limit=50");
 
-  const orders = Array.isArray(data) ? data : data?.data || []
+  const orders = Array.isArray(data) ? data : data?.data || [];
+
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  const openDetails = (id: string) => {
+    setSelectedOrderId(id);
+    setIsDetailsOpen(true);
+  };
 
   return (
     <div className="flex flex-col">
@@ -38,7 +58,9 @@ export default function OrdersPage() {
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-12">
             <ShoppingCart className="h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">Nenhum pedido ainda</h3>
-            <p className="mt-2 text-sm text-muted-foreground">Os pedidos aparecerão aqui quando receberem webhooks</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Os pedidos aparecerão aqui quando receberem webhooks
+            </p>
           </div>
         ) : (
           <div className="rounded-xl border border-border">
@@ -53,27 +75,46 @@ export default function OrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orders.map((order) => {
-                  const status = statusConfig[order.status] || statusConfig.pending
+                {orders.map((order: Order) => {
+                  const statusKey =
+                    (order.status as keyof typeof statusConfig) || "pending";
+                  const status =
+                    statusConfig[statusKey] || statusConfig.pending;
                   return (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.product_name || "Produto"}</TableCell>
-                      <TableCell>
-                        {typeof order.customer === "object" && order.customer?.name ? order.customer.name : "-"}
+                    <TableRow
+                      key={order.id}
+                      className="cursor-pointer hover:bg-muted/40"
+                      onClick={() => openDetails(order.id)}
+                    >
+                      <TableCell className="font-medium">
+                        {order.product_name || "Produto"}
                       </TableCell>
-                      <TableCell>{order.amount ? formatCurrency(order.amount) : "-"}</TableCell>
+                      <TableCell>
+                        {typeof order.customer === "object" &&
+                        order.customer?.name
+                          ? order.customer.name
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {order.amount ? formatCurrency(order.amount) : "-"}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </TableCell>
                       <TableCell>{formatDate(order.created_at)}</TableCell>
                     </TableRow>
-                  )
+                  );
                 })}
               </TableBody>
             </Table>
           </div>
         )}
       </div>
+      <OrderDetailsModal
+        orderId={selectedOrderId}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </div>
-  )
+  );
 }

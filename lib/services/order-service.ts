@@ -173,13 +173,28 @@ export class OrderService {
    * Busca pedido por ID
    */
   async findById(id: string): Promise<Order | null> {
+    // In single-tenant mode, order IDs are globally unique; allow fetch by ID without tenant filter
     return queryOne<Order>(
       `SELECT o.*, 
               json_build_object('id', c.id, 'name', c.name, 'phone', c.phone, 'email', c.email) as customer
        FROM orders o
        LEFT JOIN customers c ON o.customer_id = c.id
-       WHERE o.id = $1 AND o.tenant_id = $2`,
-      [id, this.tenantId],
+       WHERE o.id = $1`,
+      [id],
+    )
+  }
+
+  /**
+   * Busca pedido por ID ignorando tenant (fallback para ambientes single-tenant)
+   */
+  async findByIdAnyTenant(id: string): Promise<Order | null> {
+    return queryOne<Order>(
+      `SELECT o.*, 
+              json_build_object('id', c.id, 'name', c.name, 'phone', c.phone, 'email', c.email) as customer
+       FROM orders o
+       LEFT JOIN customers c ON o.customer_id = c.id
+       WHERE o.id = $1`,
+      [id],
     )
   }
 

@@ -60,7 +60,86 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     let payload: CaktoWebhookPayload
 
     try {
-      payload = JSON.parse(rawBody)
+      const raw = JSON.parse(rawBody)
+
+      // If payload follows Cakto's documented structure with a top-level `data`, map it to our internal shape
+      if (raw && typeof raw === "object" && raw.data) {
+        const d = raw.data
+        const getAmount = (): number | undefined => {
+          // Prefer explicit amount, else baseAmount/product.offer price
+          if (typeof d.amount === "number") return d.amount
+          if (typeof d.baseAmount === "number") return d.baseAmount
+          if (d.offer && typeof d.offer.price === "number") return d.offer.price
+          return undefined
+        }
+
+        const paymentMethod = d.paymentMethod || d.paymentMethodName || undefined
+        const status = d.status || undefined
+
+        const pix = d.pix || undefined
+        const boleto = d.boleto || undefined
+        const picpay = d.picpay || undefined
+
+        const productName = d.product?.name || d.offer?.name
+        const productId = d.product?.id || d.product?.short_id || d.offer?.id
+
+        const customerPhone = d.customer?.phone || d.customerCellphone
+        const customerName = d.customer?.name || d.customerName
+        const customerEmail = d.customer?.email || d.customerEmail
+        const customerDoc = d.customer?.docNumber || d.customer?.document || undefined
+
+        const mapped: CaktoWebhookPayload = {
+          event: raw.event,
+          transaction_id: d.id || d.refId || undefined,
+          customer: customerPhone
+            ? {
+                name: customerName || "",
+                email: customerEmail || undefined,
+                phone: String(customerPhone),
+                document: customerDoc || undefined,
+              }
+            : undefined,
+          product: productName || productId
+            ? {
+                id: String(productId || ""),
+                name: String(productName || "Produto"),
+                price: getAmount() ?? 0,
+              }
+            : undefined,
+          payment: {
+            method: paymentMethod || "",
+            amount: getAmount() ?? 0,
+            status: status || "",
+            boleto_url: boleto?.boletoUrl || undefined,
+            pix_code: pix?.qrCode || undefined,
+            pix_qrcode: pix?.qrCode || undefined,
+            checkout_url: d.checkoutUrl || picpay?.paymentURL || undefined,
+          },
+          metadata: {
+            affiliate: d.affiliate,
+            fees: d.fees,
+            discount: d.discount,
+            installments: d.installments,
+            utm_source: d.utm_source,
+            utm_medium: d.utm_medium,
+            utm_campaign: d.utm_campaign,
+            utm_term: d.utm_term,
+            utm_content: d.utm_content,
+            paidAt: d.paidAt,
+            createdAt: d.createdAt,
+            refundedAt: d.refundedAt,
+            chargedbackAt: d.chargedbackAt,
+            subscription: d.subscription,
+            next_payment_date: d.subscription?.next_payment_date,
+            paymentMethodName: d.paymentMethodName,
+          },
+          timestamp: new Date().toISOString(),
+        }
+
+        payload = mapped
+      } else {
+        payload = raw as CaktoWebhookPayload
+      }
     } catch {
       return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 })
     }
@@ -78,7 +157,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     }
 
     // Valida payload com Zod
-    const validationResult = CaktoPayloadSchema.safeParse(payload)
+  const validationResult = CaktoPayloadSchema.safeParse(payload)
     if (!validationResult.success) {
       console.error("Validation error:", validationResult.error.errors)
       return NextResponse.json(

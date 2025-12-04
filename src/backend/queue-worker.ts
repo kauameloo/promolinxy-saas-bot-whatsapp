@@ -60,9 +60,42 @@ async function sendMessageViaServer(
   }
 }
 
+// Verify order/payment status before sending reminder-type messages
+async function shouldSendMessage(message: ScheduledMessage): Promise<boolean> {
+  try {
+    // If linked to an order, re-check status to avoid sending after payment/refund/cancel
+    if (message.order_id) {
+      const order = await query<{ status: string }>(
+        `SELECT status FROM orders WHERE id = $1 AND tenant_id = $2 LIMIT 1`,
+        [message.order_id, message.tenant_id]
+      )
+      const status = order[0]?.status
+      if (status && ["paid", "refunded", "cancelled"].includes(status)) {
+        return false
+      }
+    }
+  } catch (e) {
+    console.warn("[Queue Worker] Failed to check order status, proceeding:", e)
+  }
+  return true
+}
+
 async function processMessage(message: ScheduledMessage): Promise<void> {
   try {
     console.log(`[Queue Worker] Processing message ${message.id} for ${message.phone}`)
+
+    // Skip if order is no longer pending
+    const okToSend = await shouldSendMessage(message)
+    if (!okToSend) {
+      await update("scheduled_messages", message.id, {
+        status: "cancelled",
+        last_attempt: new Date().toISOString(),
+        error_message: "Skipped: order no longer pending",
+      })
+      await logMessage(message, "failed", "Skipped: order no longer pending")
+      console.log(`[Queue Worker] Message ${message.id} skipped: order not pending`)
+      return
+    }
 
     // Mark as processing
     await update("scheduled_messages", message.id, {
