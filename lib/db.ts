@@ -19,20 +19,16 @@ function getSql(): NeonQueryFunction<false, false> {
 }
 
 // Export a proxy that allows both sql() calls and sql`...` tagged templates
-export const sql = new Proxy(getSql, {
-  get(target, prop) {
-    // Handle property access on the Neon instance
-    const instance = target()
+// Lazy sql export: avoids accessing DATABASE_URL at import/build time.
+// Provides both tagged-template and function-call compatibility.
+export const sql = new Proxy(function () {}, {
+  get(_target, prop) {
+    const instance = getSql() as any
     return instance[prop as keyof typeof instance]
   },
-  apply(target, thisArg, args) {
-    // For sql`...` tagged template usage
-    if (args.length > 0 && Array.isArray(args[0]) && 'raw' in args[0]) {
-      const instance = target()
-      return instance.apply(thisArg, args)
-    }
-    // For sql() function call
-    return target.apply(thisArg, args)
+  apply(_target, _thisArg, args) {
+    const instance = getSql() as any
+    return instance(...args)
   }
 }) as unknown as NeonQueryFunction<false, false>
 
@@ -40,8 +36,8 @@ export const sql = new Proxy(getSql, {
 export async function query<T>(queryText: string, params?: unknown[]): Promise<T[]> {
   try {
     const sqlInstance = getSql()
-    // Neon serverless driver expects direct call with query and params
-    const result = await sqlInstance(queryText, params || [])
+    // Use the official query API: sql.query("...", [params]) for non-tagged statements
+    const result = await (sqlInstance as any).query(queryText, params || [])
     return result as T[]
   } catch (error) {
     console.error("Database query error:", error)
@@ -98,6 +94,6 @@ export async function update<T>(table: string, id: string, data: Record<string, 
 export async function remove(table: string, id: string): Promise<boolean> {
   const queryText = `DELETE FROM ${table} WHERE id = $1`
   const sqlInstance = getSql()
-  await sqlInstance(queryText, [id])
+  await (sqlInstance as any).query(queryText, [id])
   return true
 }

@@ -11,6 +11,7 @@ import cors from "cors"
 
 const app: Application = express()
 const PORT = process.env.WHATSAPP_PORT || 3001
+const HOST = process.env.WHATSAPP_HOST || "0.0.0.0"
 
 // Middleware
 app.use(cors())
@@ -477,8 +478,8 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 })
 
 // Start server
-const server = app.listen(PORT, () => {
-  console.log(`[WhatsApp Server] Running on port ${PORT}`)
+const server = app.listen(Number(PORT), HOST, () => {
+  console.log(`[WhatsApp Server] Running on ${HOST}:${Number(PORT)}`)
   console.log(`[WhatsApp Server] Environment: ${process.env.NODE_ENV || "development"}`)
 
   // Initialize active connections after server starts

@@ -252,6 +252,70 @@ export class WhatsAppEngine {
   private lastHeartbeat: Date | null = null
   private heartbeatInterval: NodeJS.Timeout | null = null
   private isInitializing: boolean = false
+  /** Cached client config built from env and defaults */
+  private clientConfig: any | null = null
+
+  /**
+   * Build whatsapp-web.js Client configuration with robust Puppeteer flags for Docker/Chromium
+   */
+  private getClientConfig(): any {
+    if (this.clientConfig) return this.clientConfig
+
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium"
+    // Allow overriding args via env, else use proven defaults for containers
+    const envArgs = (process.env.PUPPETEER_ARGS || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+
+    const defaultArgs = [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--no-zygote",
+      "--single-process",
+      "--disable-accelerated-2d-canvas",
+      "--window-size=1920,1080",
+    ]
+
+    const puppeteerOptions = {
+      executablePath,
+      headless: true,
+      args: Array.from(new Set([...(envArgs.length ? envArgs : defaultArgs)])),
+      // Increase launch timeout to accommodate slow container startups
+      timeout: parseInt(process.env.PUPPETEER_LAUNCH_TIMEOUT || "60000", 10),
+    }
+
+    const dataPath = this.persistenceConfig?.dataPath || (process.env.WHATSAPP_SESSION_PATH || "./sessions")
+
+    // Defer require to runtime to avoid build-time issues
+    const wwebjs = require("whatsapp-web.js")
+
+    this.clientConfig = {
+      puppeteer: puppeteerOptions,
+      authStrategy: new wwebjs.LocalAuth({
+        dataPath,
+        clientId: this.sessionId ? `session-${this.sessionId}` : undefined,
+      }),
+      takeoverOnConflict: true,
+      takeoverTimeoutMs: parseInt(process.env.WHATSAPP_TAKEOVER_TIMEOUT_MS || "60000", 10),
+      qrMaxRetries: parseInt(process.env.WHATSAPP_QR_MAX_RETRIES || "3", 10),
+    }
+
+    return this.clientConfig
+  }
+
+  /**
+   * Initialize the underlying WhatsApp client if not already created.
+   * This method should be invoked by the connect flow.
+   */
+  private ensureClientInitialized(): void {
+    if (this.client) return
+    const cfg = this.getClientConfig()
+    const { Client } = require("whatsapp-web.js")
+    this.client = new Client(cfg)
+  }
 
   constructor(sessionId: string, handlers: WhatsAppEventHandlers = {}, config?: Partial<SessionPersistenceConfig>) {
     this.sessionId = sessionId
