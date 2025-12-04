@@ -1,0 +1,34 @@
+{
+   "action": {
+      "default_popup": "popup.html"
+   },
+   "background": {
+      "service_worker": "js/background.js"
+   },
+   "content_scripts": [ {
+      "css": [ "css/contentScripts.css" ],
+      "js": [ "js/contentScripts.js" ],
+      "matches": [ "https://web.whatsapp.com/*" ]
+   } ],
+   "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'"
+   },
+   "description": "Rode qualquer fluxo de TypeBot direto no Whatsapp",
+   "externally_connectable": {
+      "matches": [ "https://web.whatsapp.com/*" ]
+   },
+   "host_permissions": [ "http://*/*", "https://*/*" ],
+   "icons": {
+      "128": "/images/icon_128.png",
+      "16": "/images/icon_16.png",
+      "48": "/images/icon_48.png"
+   },
+   "manifest_version": 3,
+   "name": "TypeNinja",
+   "permissions": [ "storage" ],
+   "version": "1.4.5",
+   "web_accessible_resources": [ {
+      "matches": [ "https://web.whatsapp.com/*" ],
+      "resources": [ "js/injection.js", "js/WPP.js" ]
+   } ]
+}

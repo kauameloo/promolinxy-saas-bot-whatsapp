@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src * self blob: data: gap:; style-src * self 'unsafe-inline' blob: data: gap:; script-src * 'self' 'unsafe-eval' 'unsafe-inline' blob: data: gap:; object-src * 'self' blob: data: gap:; img-src * self 'unsafe-inline' blob: data: gap:; connect-src self * 'unsafe-inline' blob: data: gap:; frame-src * self blob: data: gap:;">
+    <link rel="stylesheet" type="text/css" href="css/popup.css">
+    <link href="fa/css/all.css" rel="stylesheet">
+    
+    <style>
+      /* Estilos modernos para o popup */
+      body {
+        background: linear-gradient(135deg, #2E2E2E 0%, #424242 50%, #1A1A1A 100%);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+      }
+      
+      .logoImage {
+         text-align: center;
+         margin-bottom: 25px;
+         padding: 20px;
+         background: rgba(255, 255, 255, 0.98);
+         border-radius: 15px;
+         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+         backdrop-filter: blur(10px);
+         position: relative;
+       }
+       
+       .logoImage img {
+         filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+       }
+       
+       .version-badge {
+          position: absolute;
+          bottom: 10px;
+          right: 15px;
+          background: linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+          box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
+        }
+      
+      /* Container principal */
+      .main-container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 20px;
+      }
+      
+      /* Input moderno */
+      input[type="text"], input[type="number"], textarea {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e1e5e9;
+        border-radius: 12px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.9);
+        box-sizing: border-box;
+      }
+      
+      input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
+        outline: none;
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        transform: translateY(-2px);
+      }
+      
+      /* Botões modernos */
+      button {
+        background: linear-gradient(135deg, #FF8C00 0%, #FF6F00 100%);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 13px;
+        box-shadow: 0 4px 15px rgba(255, 140, 0, 0.4);
+        white-space: nowrap;
+        flex: 1;
+        margin: 0 5px;
+      }
+      
+      #buttonConfig {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      
+      #buttonConfig button {
+           flex: 1;
+           min-width: 110px;
+           max-width: 140px;
+           padding: 10px 15px;
+           font-size: 12px;
+           overflow: visible;
+           text-overflow: clip;
+           text-align: center;
+         }
+      
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255, 140, 0, 0.6);
+      }
+      
+      button:active {
+        transform: translateY(0);
+      }
+      
+      /* Estilos para o botão liga/desliga */
+      .field {
+        display: inline-block;
+        position: relative;
+      }
+      
+      .field input[type="checkbox"] {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      
+      .field label {
+        display: block;
+        width: 70px;
+        height: 35px;
+        background: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%);
+        border-radius: 35px;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.3s ease;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      
+      .field label:after {
+        content: '';
+        position: absolute;
+        width: 29px;
+        height: 29px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+        top: 3px;
+        left: 3px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+      
+      .field input:checked + label {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+      }
+      
+      .field input:checked + label:after {
+        transform: translateX(35px);
+      }
+      
+      .field label i {
+        display: none;
+      }
+      
+      .field label:before {
+        content: 'OFF';
+        position: absolute;
+        right: 10px;
+        top: 8px;
+        font-size: 11px;
+        color: white;
+        font-weight: bold;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+      
+      .field input:checked + label:before {
+        content: 'ON';
+        right: auto;
+        left: 10px;
+      }
+      
+      /* Estilo para o botão de configurações */
+      #showTypeBotConfig {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #FF8C00 0%, #FF6F00 100%);
+        color: white;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 6px 20px rgba(255, 140, 0, 0.4);
+        transition: all 0.3s ease;
+        flex: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        white-space: normal !important;
+      }
+      
+      #showTypeBotConfig:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(255, 140, 0, 0.6);
+      }
+      
+      /* Container de configuração */
+      .configurationButton {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        margin: 20px 0;
+      }
+      
+      /* Seções com cards */
+       .bodylogin, #typeBotConfig {
+         background: rgba(255, 255, 255, 0.95);
+         border-radius: 20px;
+         padding: 25px;
+         margin: 20px 0;
+         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+         backdrop-filter: blur(10px);
+         border: 1px solid rgba(255, 255, 255, 0.2);
+       }
+       
+       /* Esconder seções de configuração por padrão */
+       #typeBotConfig {
+         display: none;
+         height: auto !important;
+         overflow: visible !important;
+       }
+       
+      
+      /* Títulos modernos */
+      h2, h4 {
+        background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 15px;
+      }
+      
+      /* Links modernos */
+      a {
+        color: #4CAF50;
+        text-decoration: none;
+        transition: all 0.3s ease;
+      }
+      
+      a:hover {
+        color: #2E7D32;
+        text-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+      }
+      
+      /* Rodapé moderno */
+      .footer {
+        text-align: center;
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+      
+      .footer small {
+        font-size: 13px;
+        color: #333;
+        font-weight: 500;
+      }
+      
+      .footer a {
+        color: #4CAF50;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      
+      .footer a:hover {
+        color: #2E7D32;
+        text-shadow: 0 1px 3px rgba(76, 175, 80, 0.3);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="logoImage">
+      <h1><img src="images/logo.png" alt="Logo TypeNinja" width="180"></h1>
+      <div class="version-badge">v1.4.5</div>
+    </div>
+    <div class="main-container">
+      <div>
+        <span>Link de Compartilhamento TypeBot </span>
+        <input type="text" id="urlAPI" placeholder="URL do TypeBot">
+      </div>
+      <br>
+      <div class="configurationButton">
+        <button title="Configurações" id="showTypeBotConfig"><i class="fas fa-plus"></i></button>
+        <div title="Iniciar/Parar o TypeBot" class="field">
+          <input type="checkbox" id="switch">
+          <label id="field" for="switch"></label>
+        </div>
+      </div>
+    </div>
+    <div class="bodylogin">
+      <div class="tool">
+        <div id="configTxt"><h4>Ative a versão premium 🔑</h4>Para desbloquear recursos, insira uma licença válida ou adquira uma nova.</div>
+        <div id="formLogin">
+          <input type="text" placeholder="Nome de cliente" id="user-lb">
+          <input type="text" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" id="chave-lb">
+        </div>
+        <div class="buttonsTool">
+          <button id="btn-ativar-lb" class="next">Confirmar</button>
+          <a href="https://ninjasys.com.br/typeninjaoficial" target="blank">
+            <button id="btn-premium-lb" class="next">Comprar</button>
+          </a>
+        </div>
+      </div>
+<center><br>
+    <p style="font-size: 10px; border-left: 2px solid #b9e9b6; padding-left: 5px; padding-right: 5px;">A versão premium é necessária para usar alguns recursos como: efeito digitando, escrevendo, delay entre as mensagens, imagens, vídeos, áudios, botões e etc.</p>
+</center>
+<br>
+  </div>
+    <div id="typeBotConfig">
+      <div id="configTxt">
+        <h2>Configurações</h2>
+      </div>
+      <div class="endingTypeBotConfig">
+        <label title="Marque para Desligar os Chats ao termino do TypeBot, Desmarque para Reiniciar">
+        <input type="checkbox" id="stopChatAfterEnding"> Desligar Chats ao Final do TypeBot </label>
+        <br>
+        <span>Esperar antes de reiniciar o Chat </span>
+        <input title="Depois de terminar de enviar o TypeBot para o Número, espere X segundos para reiniciar o Chat" type="number" id="endChatAfterSeconds" name="endChatAfterSeconds" min="0" value="0" /> segundos <br>
+        <br>
+      </div>
+      <div class = "delayConfig">
+        <!-- <label title="Troca as Enquetes para Listas, Desmarque para voltar para Enquetes"> <input type="checkbox" id="changePollToList"> Alterar Enquete Para Lista </label>
+        <br> -->
+        <label title="Fixa os delays das conversas, Desmarque a opção para seguir o delay registrados no TypeBot"> <input type="checkbox" id="activeDelay"> Ativar Delay Fixo</label>
+        <br>
+        <span>Simular Escrevendo...</span>
+        <input title="Simula o status de 'Enviando...' por X segundos" type="number" id="delayPerText" name="delayPerText" min="2" value="5" /> segundos <br><br>
+        <span>Simular Gravando Audio...</span>
+        <input title="Simula o status de 'Gravando Audio...' por X segundos" type="number" id="delayPerAudio" name="delayPerAudio" min="2" value="5"/> segundos <br><br>
+        <span>Simular Delay nas Mensagens</span>
+        <input title="Espera X segundos antes de continuar as Mensagens" type="number" id="delayPerMessage" name="delayPerMessage" min="1" value="2"/> segundos
+        <br>
+        <br>
+      </div>
+      <div class="linkInput" style="text-align: center;">
+        <label for="linkList">Lista de Redirects:</label><br>
+        <textarea title="Envia o link da Segunda Coluna ao invés da Primeira" id="linkList" placeholder="link1; Novo link"></textarea>
+        <br>
+      </div>
+      <div id="buttonConfig">
+        <button id="saveBot" title="Salva as configurações">Salvar</button>
+        <button id="resetNumbers" title="Reinicia todas as conversas efetuada pelo TypeNinja" >Reiniciar Chats</button>
+      </div>
+    </div>
+
+	<div class="footer">
+      <small><a href="https://wa.me/5519971312684?text=Oi,%20preciso%20de%20ajuda%20com%20o%20TypeNinja" target="_blank">Precisa de ajuda?</a> - TypeNinja v1.4.5</small>
+    </div>
+ 
+ 	<script src="js/popup.js"></script><br>
+  </body>
+</html>
