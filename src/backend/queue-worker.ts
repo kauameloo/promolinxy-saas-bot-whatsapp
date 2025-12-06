@@ -65,13 +65,55 @@ async function shouldSendMessage(message: ScheduledMessage): Promise<boolean> {
   try {
     // If linked to an order, re-check status to avoid sending after payment/refund/cancel
     if (message.order_id) {
-      const order = await query<{ status: string }>(
+      // Load order status
+      const orderRow = await queryOne<{ status: string }>(
         `SELECT status FROM orders WHERE id = $1 AND tenant_id = $2 LIMIT 1`,
         [message.order_id, message.tenant_id]
       )
-      const status = order[0]?.status
-      if (status && ["paid", "refunded", "cancelled"].includes(status)) {
-        return false
+      const status = orderRow?.status
+
+      // If we know which flow produced this scheduled message, check its event type
+      // Purchase-approved flows are meant to be sent when order is PAID, so allow them
+      if (message.flow_id) {
+        try {
+          const flowRow = await queryOne<{ event_type: string }>(
+            `SELECT event_type FROM message_flows WHERE id = $1 AND tenant_id = $2 LIMIT 1`,
+            [message.flow_id, message.tenant_id]
+          )
+          const eventType = flowRow?.event_type
+
+          // If this is the purchase_approved flow, send only when the order is paid
+          if (eventType === "purchase_approved") {
+            return status === "paid"
+          }
+
+          // If this is a checkout_abandonment flow (abandoned checkout), the
+          // order is intentionally created with status 'cancelled'. In this case
+          // we should allow sending the abandonment flow when the order is
+          // 'cancelled' or still 'pending', but not if the order is already
+          // 'paid' or 'refunded'. This avoids cancelling expected abandonment
+          // messages while still preventing spam after payment.
+          if (eventType === "checkout_abandonment") {
+            return !(status === "paid" || status === "refunded")
+          }
+
+          // For other flows (eg. pix_gerado, boleto_gerado), skip sending if the
+          // order is already finalized (paid/refunded/cancelled).
+          if (status && ["paid", "refunded", "cancelled"].includes(status)) {
+            return false
+          }
+        } catch (e) {
+          // If flow lookup fails for any reason, fall back to conservative behavior:
+          // do not send if order is already finalized.
+          if (status && ["paid", "refunded", "cancelled"].includes(status)) {
+            return false
+          }
+        }
+      } else {
+        // No flow_id available: preserve previous behavior
+        if (status && ["paid", "refunded", "cancelled"].includes(status)) {
+          return false
+        }
       }
     }
   } catch (e) {
