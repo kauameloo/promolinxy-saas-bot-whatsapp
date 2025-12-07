@@ -17,13 +17,13 @@ O usuário relatou que estava recebendo webhooks da Cakto, mas:
 - Avisos quando dados importantes estão faltando
 
 **Como usar:**
-```bash
+\`\`\`bash
 # Os logs detalhados aparecem automaticamente em development
 docker-compose logs -f frontend | grep "CAKTO WEBHOOK"
-```
+\`\`\`
 
 **Exemplo de log:**
-```
+\`\`\`
 === CAKTO WEBHOOK RECEIVED ===
 Event Type: pix_gerado
 Transaction ID: TRX-12345
@@ -43,7 +43,7 @@ Payment Data: {
   "amount": 497,
   ...
 }
-```
+\`\`\`
 
 ### 2. Logs Seguros em Produção
 
@@ -53,10 +53,10 @@ Payment Data: {
 - Pode ser habilitado com variável de ambiente quando necessário
 
 **Como ativar em produção (temporariamente):**
-```bash
+\`\`\`bash
 # Adicionar ao .env
 WEBHOOK_DEBUG_LOG=true
-```
+\`\`\`
 
 ### 3. Captura Completa de Dados
 
@@ -91,7 +91,7 @@ WEBHOOK_DEBUG_LOG=true
 - Mantém histórico completo em metadados
 
 **Exemplo:**
-```typescript
+\`\`\`typescript
 // Antes: poderia sobrescrever email com ""
 if (newEmail) customer.email = newEmail
 
@@ -99,7 +99,7 @@ if (newEmail) customer.email = newEmail
 if (newEmail && newEmail.trim() !== "" && newEmail !== customer.email) {
   updateData.email = newEmail
 }
-```
+\`\`\`
 
 ### 5. Helper Functions
 
@@ -124,7 +124,7 @@ Todas as variáveis agora são populadas corretamente:
 | `{{link_checkout}}` | `payment.checkout_url` | ✅ Logado |
 
 **Exemplo de log de variáveis:**
-```
+\`\`\`
 Message variables for flow: {
   nome: "João Silva",
   email: "joao@email.com",
@@ -135,7 +135,7 @@ Message variables for flow: {
   hasQrCode: true,
   hasLinkCheckout: true
 }
-```
+\`\`\`
 
 ## Arquivos Modificados
 
@@ -155,12 +155,12 @@ Message variables for flow: {
 ## Como Verificar se Está Funcionando
 
 ### 1. Verificar Logs
-```bash
+\`\`\`bash
 docker-compose logs -f frontend | grep "CAKTO\|Customer\|Order\|Message"
-```
+\`\`\`
 
 ### 2. Verificar Banco de Dados
-```sql
+\`\`\`sql
 -- Ver últimos clientes criados com todos os dados
 SELECT name, email, phone, document, created_at 
 FROM customers 
@@ -183,25 +183,25 @@ SELECT
 FROM webhook_events 
 ORDER BY created_at DESC 
 LIMIT 5;
-```
+\`\`\`
 
 ### 3. Testar com Script
-```bash
+\`\`\`bash
 # Enviar webhooks de teste com todos os campos
 /tmp/test-webhooks.sh
-```
+\`\`\`
 
 ## Diagnóstico de Problemas
 
 ### Sintoma: Nome do cliente não aparece
 
 **Verifique nos logs:**
-```
+\`\`\`
 Customer Data: {
   "name": "???",  ← deve ter um nome aqui
   ...
 }
-```
+\`\`\`
 
 **Causa comum:** Cakto não está enviando `customer.name` no webhook
 
@@ -212,14 +212,14 @@ Customer Data: {
 ### Sintoma: Valor R$ 0,00
 
 **Verifique nos logs:**
-```
+\`\`\`
 Payment Data: {
   "amount": ???,  ← deve ter valor aqui
 }
 Product Data: {
   "price": ???  ← ou aqui
 }
-```
+\`\`\`
 
 **Causa comum:** Nem `payment.amount` nem `product.price` foram enviados
 
@@ -228,9 +228,9 @@ Product Data: {
 ### Sintoma: Mensagens não estão sendo enviadas
 
 **Verifique nos logs:**
-```
+\`\`\`
 ⚠ No customer phone found in webhook payload
-```
+\`\`\`
 
 **Causa:** Falta o campo `customer.phone`
 

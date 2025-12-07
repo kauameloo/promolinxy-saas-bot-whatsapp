@@ -9,7 +9,7 @@ Fixed 3 critical issues causing API 500 errors:
 
 ## Quick Deploy (Docker Compose)
 
-```bash
+\`\`\`bash
 # 1. Update your .env file
 cat >> .env << EOF
 NEXT_PUBLIC_API_URL=https://www.promolinxy.online
@@ -24,17 +24,17 @@ docker-compose up -d
 
 # 3. Verify
 docker-compose logs -f frontend
-```
+\`\`\`
 
 ## Quick Test
 
-```bash
+\`\`\`bash
 # Replace with your domain
 curl https://www.promolinxy.online/api/auth/login \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@saasbot.com","password":"admin123"}'
-```
+\`\`\`
 
 If you get a token back (not a 500 error), the fix worked! 🎉
 
@@ -51,11 +51,11 @@ If you get a token back (not a 500 error), the fix worked! 🎉
 ⚠️ **IMPORTANT**: `NEXT_PUBLIC_API_URL` is embedded at **BUILD TIME**, not runtime!
 
 If you change this variable, you **MUST REBUILD**:
-```bash
+\`\`\`bash
 docker-compose build --no-cache frontend
 # or
 npm run build
-```
+\`\`\`
 
 ## Still Having Issues?
 

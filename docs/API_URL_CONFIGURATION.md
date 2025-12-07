@@ -22,13 +22,13 @@ All API calls now use the `NEXT_PUBLIC_API_URL` environment variable to construc
 
 Add the following to your `.env` file or environment configuration:
 
-```bash
+\`\`\`bash
 # For local development (default)
 NEXT_PUBLIC_API_URL=http://localhost:3000
 
 # For production with separate backend
 NEXT_PUBLIC_API_URL=https://api.promolinxy.online
-```
+\`\`\`
 
 ### 2. Deployment Instructions
 
@@ -47,12 +47,12 @@ No configuration needed! The default value will work automatically.
 #### Docker Deployment
 Add the environment variable to your `docker-compose.yml`:
 
-```yaml
+\`\`\`yaml
 services:
   frontend:
     environment:
       - NEXT_PUBLIC_API_URL=https://api.promolinxy.online
-```
+\`\`\`
 
 ## How It Works
 
@@ -78,14 +78,14 @@ All API calls now go through utility functions that automatically prepend the `N
 
 All existing code continues to work without changes:
 
-```typescript
+\`\`\`typescript
 // In your components
 const { data, isLoading } = useApi<User[]>("/api/users")
 
 // Will automatically call:
 // - Local: http://localhost:3000/api/users
 // - Production: https://api.promolinxy.online/api/users
-```
+\`\`\`
 
 ## Benefits
 
@@ -101,22 +101,22 @@ const { data, isLoading } = useApi<User[]>("/api/users")
 
 **Solution**: Make sure `NEXT_PUBLIC_API_URL` is set correctly and rebuild your application.
 
-```bash
+\`\`\`bash
 # Rebuild to pick up environment variable changes
 npm run build
-```
+\`\`\`
 
 ### Issue: CORS errors
 
 **Solution**: Configure CORS on your backend to allow requests from your frontend domain:
 
-```javascript
+\`\`\`javascript
 // Backend server
 app.use(cors({
   origin: 'https://www.promolinxy.online',
   credentials: true
 }))
-```
+\`\`\`
 
 ### Issue: Environment variable not working
 

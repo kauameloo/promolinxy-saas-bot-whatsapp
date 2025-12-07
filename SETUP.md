@@ -16,23 +16,23 @@ Antes de começar, certifique-se de ter instalado:
 - **PostgreSQL 15+** → [Baixar aqui](https://www.postgresql.org/download/) OU use [Neon](https://neon.tech) (gratuito online)
 
 Para verificar se está instalado:
-```bash
+\`\`\`bash
 node --version    # Deve mostrar v18.x.x ou superior
 npm --version     # Deve mostrar 9.x.x ou superior
-```
+\`\`\`
 
 ### 2️⃣ Clonar o Projeto
 
-```bash
+\`\`\`bash
 git clone https://github.com/kauameloo/promolinxy-saas-bot-whatsapp.git
 cd promolinxy-saas-bot-whatsapp
-```
+\`\`\`
 
 ### 3️⃣ Instalar Dependências
 
-```bash
+\`\`\`bash
 npm install
-```
+\`\`\`
 
 ### 4️⃣ Configurar o Banco de Dados
 
@@ -43,22 +43,22 @@ npm install
 3. Copie a "Connection String" que aparece
 4. Crie o arquivo `.env` na raiz do projeto:
 
-```bash
+\`\`\`bash
 cp .env.example .env
-```
+\`\`\`
 
 5. Abra o `.env` e cole a connection string:
 
-```bash
+\`\`\`bash
 DATABASE_URL=postgresql://seu-usuario:sua-senha@ep-xxx.neon.tech/neondb?sslmode=require
 JWT_SECRET=minha-chave-secreta-super-segura-com-mais-de-64-caracteres-aqui-ok
-```
+\`\`\`
 
 6. No Neon, vá em "SQL Editor" e cole todo o conteúdo do arquivo `scripts/001-create-database-schema.sql`, depois clique em "Run"
 
 **Opção B - Usando PostgreSQL Local:**
 
-```bash
+\`\`\`bash
 # 1. Criar banco e usuário (no terminal do PostgreSQL)
 sudo -u postgres psql
 CREATE USER saasbot WITH PASSWORD 'saasbot123';
@@ -71,19 +71,19 @@ psql -U saasbot -d saasbot -f scripts/001-create-database-schema.sql
 
 # 3. Criar arquivo .env
 cp .env.example .env
-```
+\`\`\`
 
 No arquivo `.env`, configure:
-```bash
+\`\`\`bash
 DATABASE_URL=postgresql://saasbot:saasbot123@localhost:5432/saasbot
 JWT_SECRET=minha-chave-secreta-super-segura-com-mais-de-64-caracteres-aqui-ok
-```
+\`\`\`
 
 ### 5️⃣ Rodar o Projeto
 
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 ### 6️⃣ Acessar o Dashboard
 
@@ -108,7 +108,7 @@ Agora você pode:
 
 ## 🛠️ Comandos Úteis para Desenvolvimento Local
 
-```bash
+\`\`\`bash
 # Iniciar servidor de desenvolvimento (Frontend)
 npm run dev
 
@@ -132,7 +132,7 @@ npm run lint
 
 # Limpar cache do Next.js (se tiver problemas)
 rm -rf .next
-```
+\`\`\`
 
 ---
 
@@ -221,7 +221,7 @@ O **SaaS Bot WhatsApp** é um sistema completo de automação de mensagens Whats
 
 ## 📁 Estrutura do Projeto
 
-```
+\`\`\`
 promolinxy-saas-bot-whatsapp/
 ├── app/                          # Next.js App Router
 │   ├── api/                      # API Routes
@@ -313,7 +313,7 @@ promolinxy-saas-bot-whatsapp/
 ├── tsconfig.json                 # TypeScript config (Frontend)
 ├── tsconfig.backend.json         # TypeScript config (Backend)
 └── README.md                     # Documentação básica
-```
+\`\`\`
 
 ---
 
@@ -321,26 +321,26 @@ promolinxy-saas-bot-whatsapp/
 
 ### Passo 1: Clonar o Repositório
 
-```bash
+\`\`\`bash
 # Clone o repositório
 git clone https://github.com/kauameloo/promolinxy-saas-bot-whatsapp.git
 
 # Entre no diretório
 cd promolinxy-saas-bot-whatsapp
-```
+\`\`\`
 
 ### Passo 2: Criar o Arquivo .env
 
-```bash
+\`\`\`bash
 # Copie o arquivo de exemplo
 cp .env.example .env
-```
+\`\`\`
 
 ### Passo 3: Configurar as Variáveis de Ambiente
 
 Abra o arquivo `.env` e configure cada variável:
 
-```bash
+\`\`\`bash
 # =====================================================
 # SAAS BOT WHATSAPP - Environment Variables
 # =====================================================
@@ -378,7 +378,7 @@ WHATSAPP_SESSION_PATH=/app/sessions
 # ========== TENANT ==========
 # ID do tenant padrão (para modo single-tenant)
 DEFAULT_TENANT_ID=00000000-0000-0000-0000-000000000001
-```
+\`\`\`
 
 ### Explicação das Variáveis
 
@@ -400,13 +400,13 @@ DEFAULT_TENANT_ID=00000000-0000-0000-0000-000000000001
 
 ### Passo 1: Instalar Dependências
 
-```bash
+\`\`\`bash
 # Usando npm
 npm install
 
 # OU usando pnpm (mais rápido)
 pnpm install
-```
+\`\`\`
 
 ### Passo 2: Configurar o Banco de Dados
 
@@ -414,13 +414,13 @@ Veja a seção [Configuração do Banco de Dados](#-configuração-do-banco-de-d
 
 ### Passo 3: Rodar em Modo Desenvolvimento
 
-```bash
+\`\`\`bash
 # Inicia o servidor de desenvolvimento
 npm run dev
 
 # OU com pnpm
 pnpm dev
-```
+\`\`\`
 
 O servidor estará disponível em: **http://localhost:3000**
 
@@ -434,7 +434,7 @@ O servidor estará disponível em: **http://localhost:3000**
 
 ### Comandos Úteis de Desenvolvimento
 
-```bash
+\`\`\`bash
 # Rodar servidor de desenvolvimento
 npm run dev
 
@@ -449,7 +449,7 @@ npm run lint
 
 # Limpar cache do Next.js
 rm -rf .next
-```
+\`\`\`
 
 ---
 
@@ -471,13 +471,13 @@ O [Neon](https://neon.tech/) é um PostgreSQL serverless ideal para aplicações
 
 1. No dashboard do Neon, vá em "Connection Details"
 2. Copie a connection string (será algo como):
-   ```
+   \`\`\`
    postgresql://username:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
-   ```
+   \`\`\`
 3. Cole no arquivo `.env`:
-   ```bash
+   \`\`\`bash
    DATABASE_URL=postgresql://username:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
-   ```
+   \`\`\`
 
 #### Passo 3: Executar o Schema
 
@@ -491,23 +491,23 @@ O [Neon](https://neon.tech/) é um PostgreSQL serverless ideal para aplicações
 #### Instalar PostgreSQL
 
 **Ubuntu/Debian:**
-```bash
+\`\`\`bash
 sudo apt update
 sudo apt install postgresql postgresql-contrib
-```
+\`\`\`
 
 **macOS (Homebrew):**
-```bash
+\`\`\`bash
 brew install postgresql@15
 brew services start postgresql@15
-```
+\`\`\`
 
 **Windows:**
 Baixe o instalador em [postgresql.org](https://www.postgresql.org/download/windows/)
 
 #### Criar Banco de Dados
 
-```bash
+\`\`\`bash
 # Conectar ao PostgreSQL
 sudo -u postgres psql
 
@@ -522,32 +522,32 @@ GRANT ALL PRIVILEGES ON DATABASE saasbot TO saasbot;
 
 # Sair
 \q
-```
+\`\`\`
 
 #### Executar o Schema
 
-```bash
+\`\`\`bash
 # Executar o script SQL
 psql -U saasbot -d saasbot -f scripts/001-create-database-schema.sql
-```
+\`\`\`
 
 #### Configurar .env
 
-```bash
+\`\`\`bash
 DATABASE_URL=postgresql://saasbot:saasbot123@localhost:5432/saasbot
-```
+\`\`\`
 
 ### Opção 3: PostgreSQL com Docker
 
 Se estiver usando Docker Compose, o banco será criado automaticamente.
 
-```bash
+\`\`\`bash
 # Subir apenas o PostgreSQL
 docker-compose up -d postgres
 
 # Verificar se está rodando
 docker-compose logs postgres
-```
+\`\`\`
 
 O script SQL em `scripts/` será executado automaticamente na primeira inicialização.
 
@@ -559,23 +559,23 @@ O script SQL em `scripts/` será executado automaticamente na primeira inicializ
 
 Certifique-se de que o Docker e Docker Compose estão instalados:
 
-```bash
+\`\`\`bash
 # Verificar Docker
 docker --version
 
 # Verificar Docker Compose
 docker-compose --version
-```
+\`\`\`
 
 ### Passo 2: Configurar Variáveis de Ambiente
 
-```bash
+\`\`\`bash
 # Copiar arquivo de exemplo
 cp .env.example .env
 
 # Editar com suas configurações
 nano .env
-```
+\`\`\`
 
 Configure especialmente:
 - `DATABASE_URL` - Se usar banco externo (Neon)
@@ -584,17 +584,17 @@ Configure especialmente:
 
 ### Passo 3: Build e Inicialização
 
-```bash
+\`\`\`bash
 # Build de todos os serviços
 docker-compose build
 
 # Iniciar todos os serviços
 docker-compose up -d
-```
+\`\`\`
 
 ### Passo 4: Verificar Status
 
-```bash
+\`\`\`bash
 # Ver status dos containers
 docker-compose ps
 
@@ -605,7 +605,7 @@ docker-compose logs -f
 docker-compose logs -f frontend
 docker-compose logs -f whatsapp-engine
 docker-compose logs -f postgres
-```
+\`\`\`
 
 ### Passo 5: Acessar a Aplicação
 
@@ -618,7 +618,7 @@ docker-compose logs -f postgres
 
 ### Comandos Docker Úteis
 
-```bash
+\`\`\`bash
 # Parar todos os serviços
 docker-compose down
 
@@ -633,11 +633,11 @@ docker exec -it saasbot-frontend sh
 
 # Ver uso de recursos
 docker stats
-```
+\`\`\`
 
 ### Arquitetura dos Serviços Docker
 
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────────────┐
 │                         NGINX                                │
 │                    (Reverse Proxy)                           │
@@ -665,7 +665,7 @@ docker stats
             │       (Cache/Filas)         │
             │        Porta: 6379          │
             └─────────────────────────────┘
-```
+\`\`\`
 
 ---
 
@@ -714,13 +714,13 @@ Na tela de configuração do projeto:
 
 No arquivo `vercel.json` (crie se não existir):
 
-```json
+\`\`\`json
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs"
 }
-```
+\`\`\`
 
 ---
 
@@ -736,7 +736,7 @@ O WhatsApp Engine é o serviço responsável pelo envio de mensagens. Ele usa a 
 
 #### Passo 1: Preparar o Servidor
 
-```bash
+\`\`\`bash
 # Atualizar sistema
 sudo apt update && sudo apt upgrade -y
 
@@ -758,11 +758,11 @@ sudo apt install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils
-```
+\`\`\`
 
 #### Passo 2: Instalar Docker
 
-```bash
+\`\`\`bash
 # Instalar Docker
 curl -fsSL https://get.docker.com | sh
 
@@ -775,11 +775,11 @@ newgrp docker
 # Instalar Docker Compose
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
-```
+\`\`\`
 
 #### Passo 3: Clonar e Configurar
 
-```bash
+\`\`\`bash
 # Clonar repositório
 git clone https://github.com/kauameloo/promolinxy-saas-bot-whatsapp.git
 cd promolinxy-saas-bot-whatsapp
@@ -787,21 +787,21 @@ cd promolinxy-saas-bot-whatsapp
 # Configurar ambiente
 cp .env.example .env
 nano .env
-```
+\`\`\`
 
 #### Passo 4: Iniciar com Docker
 
-```bash
+\`\`\`bash
 # Subir apenas o WhatsApp Engine
 docker-compose up -d whatsapp-engine
 
 # Ver logs
 docker-compose logs -f whatsapp-engine
-```
+\`\`\`
 
 ### Opção 2: Rodar Localmente (Desenvolvimento)
 
-```bash
+\`\`\`bash
 # Instalar dependências
 npm install
 
@@ -816,7 +816,7 @@ pm2 status
 
 # Ver logs
 pm2 logs whatsapp-engine
-```
+\`\`\`
 
 ### Conectar o WhatsApp
 
@@ -849,11 +849,11 @@ pm2 logs whatsapp-engine
 
 Configure o endpoint:
 
-```
+\`\`\`
 URL: https://seu-dominio.com/api/webhooks/cakto
 Método: POST
 Content-Type: application/json
-```
+\`\`\`
 
 ### Passo 3: Selecionar Eventos
 
@@ -870,19 +870,19 @@ Marque todos os eventos que deseja receber:
 ### Passo 4: Configurar Secret (Opcional, mas Recomendado)
 
 1. Gere um secret seguro:
-   ```bash
+   \`\`\`bash
    openssl rand -hex 32
-   ```
+   \`\`\`
 2. Configure na Cakto e no seu `.env`:
-   ```bash
+   \`\`\`bash
    CAKTO_WEBHOOK_SECRET=seu-secret-gerado
-   ```
+   \`\`\`
 
 ### Passo 5: Testar Webhook
 
 Use curl para testar:
 
-```bash
+\`\`\`bash
 curl -X POST https://seu-dominio.com/api/webhooks/cakto \
   -H "Content-Type: application/json" \
   -d '{
@@ -905,7 +905,7 @@ curl -X POST https://seu-dominio.com/api/webhooks/cakto \
       "pix_code": "00020126580014br.gov.bcb..."
     }
   }'
-```
+\`\`\`
 
 ### Verificar no Dashboard
 
@@ -924,11 +924,11 @@ Acesse **Dashboard > Eventos** para ver os webhooks recebidos.
 | `GET` | `/api/auth/me` | Dados do usuário logado |
 
 **Exemplo de Login:**
-```bash
+\`\`\`bash
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "admin@saasbot.com", "password": "admin123"}'
-```
+\`\`\`
 
 ### Dashboard
 
@@ -1040,7 +1040,7 @@ Use estas variáveis nos templates:
 | `{{link_checkout}}` | Link do checkout |
 
 **Exemplo de Mensagem:**
-```
+\`\`\`
 Olá {{nome}}! 👋
 
 Seu PIX do *{{produto}}* está pronto!
@@ -1048,12 +1048,12 @@ Seu PIX do *{{produto}}* está pronto!
 Valor: *{{preco}}*
 
 Código PIX:
-```
+\`\`\`
 {{qr_code}}
-```
+\`\`\`
 
 Copie e cole no seu banco! 🚀
-```
+\`\`\`
 
 ### Clientes
 
@@ -1096,7 +1096,7 @@ Gerencie a conexão:
 
 ### Logs do Docker
 
-```bash
+\`\`\`bash
 # Todos os serviços
 docker-compose logs -f
 
@@ -1108,11 +1108,11 @@ docker-compose logs -f whatsapp-engine
 
 # PostgreSQL
 docker-compose logs -f postgres
-```
+\`\`\`
 
 ### Logs do PM2
 
-```bash
+\`\`\`bash
 # Ver todos os logs
 pm2 logs
 
@@ -1122,7 +1122,7 @@ pm2 logs message-queue
 
 # Monitorar em tempo real
 pm2 monit
-```
+\`\`\`
 
 ### Logs do Sistema
 
@@ -1134,13 +1134,13 @@ Os logs são salvos em:
 
 ### Verificar Saúde dos Serviços
 
-```bash
+\`\`\`bash
 # Health check via curl
 curl http://localhost/health
 
 # Status do WhatsApp
 curl http://localhost:3000/api/whatsapp/status
-```
+\`\`\`
 
 ---
 
@@ -1150,17 +1150,17 @@ curl http://localhost:3000/api/whatsapp/status
 
 #### Backup Manual
 
-```bash
+\`\`\`bash
 # Criar backup
 docker exec saasbot-postgres pg_dump -U saasbot saasbot > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Ou se estiver usando PostgreSQL local
 pg_dump -U saasbot saasbot > backup_$(date +%Y%m%d_%H%M%S).sql
-```
+\`\`\`
 
 #### Backup Automático (Cron)
 
-```bash
+\`\`\`bash
 # Criar script de backup
 cat > /opt/backup.sh << 'EOF'
 #!/bin/bash
@@ -1176,24 +1176,24 @@ chmod +x /opt/backup.sh
 
 # Agendar no cron (backup às 2h da manhã)
 echo "0 2 * * * /opt/backup.sh" | crontab -
-```
+\`\`\`
 
 ### Restaurar Backup
 
-```bash
+\`\`\`bash
 # Restaurar backup
 docker exec -i saasbot-postgres psql -U saasbot saasbot < backup_20240101_120000.sql
 
 # Ou se estiver comprimido
 gunzip -c backup_20240101_120000.sql.gz | docker exec -i saasbot-postgres psql -U saasbot saasbot
-```
+\`\`\`
 
 ### Backup das Sessões WhatsApp
 
-```bash
+\`\`\`bash
 # As sessões são salvas no volume
 docker cp saasbot-whatsapp:/app/sessions ./sessions_backup
-```
+\`\`\`
 
 ---
 
@@ -1207,7 +1207,7 @@ docker cp saasbot-whatsapp:/app/sessions ./sessions_backup
 
 Se você recebeu um erro 500 ao tentar fazer login com as credenciais padrão (`admin@saasbot.com` / `admin123`), execute esta correção:
 
-```bash
+\`\`\`bash
 # Se usando Neon Database:
 # 1. Vá ao SQL Editor no dashboard do Neon
 # 2. Execute o seguinte SQL:
@@ -1221,7 +1221,7 @@ WHERE email = 'admin@saasbot.com';
 
 # Se usando PostgreSQL local:
 psql -U saasbot -d saasbot -f scripts/002-fix-admin-password-hash.sql
-```
+\`\`\`
 
 **Nota:** Esta correção atualiza o hash da senha do admin de bcrypt para SHA256, que é o formato usado pela aplicação.
 
@@ -1230,21 +1230,21 @@ psql -U saasbot -d saasbot -f scripts/002-fix-admin-password-hash.sql
 **Causa:** Variável de ambiente não configurada.
 
 **Solução:**
-```bash
+\`\`\`bash
 # Verificar se o .env existe
 cat .env
 
 # Se não existir, criar
 cp .env.example .env
 nano .env
-```
+\`\`\`
 
 ### Problema: "Connection refused" ao conectar no PostgreSQL
 
 **Causa:** PostgreSQL não está rodando ou porta bloqueada.
 
 **Solução:**
-```bash
+\`\`\`bash
 # Docker
 docker-compose up -d postgres
 docker-compose logs postgres
@@ -1252,20 +1252,20 @@ docker-compose logs postgres
 # Local
 sudo systemctl start postgresql
 sudo systemctl status postgresql
-```
+\`\`\`
 
 ### Problema: QR Code não aparece
 
 **Causa:** WhatsApp Engine não está rodando corretamente.
 
 **Solução:**
-```bash
+\`\`\`bash
 # Ver logs do WhatsApp Engine
 docker-compose logs -f whatsapp-engine
 
 # Reiniciar serviço
 docker-compose restart whatsapp-engine
-```
+\`\`\`
 
 ### Problema: Mensagens não estão sendo enviadas
 
@@ -1275,9 +1275,9 @@ docker-compose restart whatsapp-engine
 1. Verifique status no dashboard
 2. Reconecte o WhatsApp se necessário
 3. Verifique logs da fila:
-   ```bash
+   \`\`\`bash
    pm2 logs message-queue
-   ```
+   \`\`\`
 
 ### Problema: Webhook não está recebendo eventos
 
@@ -1285,14 +1285,14 @@ docker-compose restart whatsapp-engine
 
 **Solução:**
 1. Verifique se a URL está acessível:
-   ```bash
+   \`\`\`bash
    curl -X GET https://seu-dominio.com/api/webhooks/cakto
-   ```
+   \`\`\`
 2. Verifique configuração na Cakto
 3. Verifique logs do Nginx:
-   ```bash
+   \`\`\`bash
    docker-compose logs nginx
-   ```
+   \`\`\`
 
 ### Problema: Build falha na Vercel
 
@@ -1301,9 +1301,9 @@ docker-compose restart whatsapp-engine
 **Solução:**
 1. Verifique variáveis de ambiente na Vercel
 2. Rode build localmente para ver erros:
-   ```bash
+   \`\`\`bash
    npm run build
-   ```
+   \`\`\`
 
 ### Problema: "Invalid signature" no webhook
 
@@ -1344,7 +1344,7 @@ docker-compose restart whatsapp-engine
 
 ### Configurar SSL com Certbot
 
-```bash
+\`\`\`bash
 # Instalar Certbot
 sudo apt install certbot
 
@@ -1354,11 +1354,11 @@ sudo certbot certonly --standalone -d seu-dominio.com
 # Copiar certificados para Docker
 sudo cp /etc/letsencrypt/live/seu-dominio.com/fullchain.pem ./docker/ssl/cert.pem
 sudo cp /etc/letsencrypt/live/seu-dominio.com/privkey.pem ./docker/ssl/key.pem
-```
+\`\`\`
 
 ### Configurar Firewall
 
-```bash
+\`\`\`bash
 # Instalar UFW
 sudo apt install ufw
 
@@ -1369,7 +1369,7 @@ sudo ufw allow 443/tcp
 
 # Ativar firewall
 sudo ufw enable
-```
+\`\`\`
 
 ---
 
@@ -1409,7 +1409,7 @@ Sim! O sistema é extensível. Basta criar novos endpoints de webhook.
 ### 6. Como adicionar novos usuários?
 
 Atualmente via banco de dados:
-```sql
+\`\`\`sql
 INSERT INTO users (tenant_id, email, password_hash, name, role)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
@@ -1418,7 +1418,7 @@ VALUES (
   'Novo Usuário',
   'user'
 );
-```
+\`\`\`
 
 ### 7. O projeto suporta multi-tenancy?
 
@@ -1426,7 +1426,7 @@ Sim! A arquitetura está pronta. Cada tenant tem dados isolados pelo `tenant_id`
 
 ### 8. Como atualizar o projeto?
 
-```bash
+\`\`\`bash
 # Pull das atualizações
 git pull origin main
 
@@ -1436,7 +1436,7 @@ npm install
 # Rebuild Docker
 docker-compose build --no-cache
 docker-compose up -d
-```
+\`\`\`
 
 ---
 

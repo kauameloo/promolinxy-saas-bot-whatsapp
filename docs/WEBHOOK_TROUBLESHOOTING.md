@@ -4,16 +4,16 @@
 
 ### Passo 1: Verifique os Logs do Servidor
 
-```bash
+\`\`\`bash
 # Se estiver usando Docker
 docker-compose logs -f frontend | grep "CAKTO WEBHOOK"
 
 # Ou logs gerais
 docker-compose logs -f frontend
-```
+\`\`\`
 
 **O que procurar:**
-```
+\`\`\`
 === CAKTO WEBHOOK RECEIVED ===
 Event Type: pix_gerado
 Transaction ID: TRX-123
@@ -30,33 +30,33 @@ Payment Data: {
   "amount": 497,             ← Valor do pagamento
   ...
 }
-```
+\`\`\`
 
 ### Passo 2: Verifique no Banco de Dados
 
-```bash
+\`\`\`bash
 # Conecte ao PostgreSQL
 docker-compose exec postgres psql -U saasbot -d saasbot
-```
+\`\`\`
 
 **Verifique os clientes:**
-```sql
+\`\`\`sql
 SELECT id, name, email, phone, created_at 
 FROM customers 
 ORDER BY created_at DESC 
 LIMIT 10;
-```
+\`\`\`
 
 **Verifique os pedidos:**
-```sql
+\`\`\`sql
 SELECT id, product_name, amount, payment_method, status, created_at 
 FROM orders 
 ORDER BY created_at DESC 
 LIMIT 10;
-```
+\`\`\`
 
 **Verifique os eventos de webhook:**
-```sql
+\`\`\`sql
 SELECT 
   id, 
   event_type, 
@@ -67,12 +67,12 @@ SELECT
 FROM webhook_events 
 ORDER BY created_at DESC 
 LIMIT 5;
-```
+\`\`\`
 
 ### Passo 3: Verifique as Mensagens Variáveis
 
 Procure nos logs por:
-```
+\`\`\`
 Message variables for flow: {
   nome: "João Silva",        ← Nome disponível?
   email: "joao@email.com",   ← Email disponível?
@@ -80,7 +80,7 @@ Message variables for flow: {
   preco: "R$ 497,00",        ← Preço formatado?
   ...
 }
-```
+\`\`\`
 
 Se aparecer `(empty)`, significa que o dado não veio no webhook.
 
@@ -88,9 +88,9 @@ Se aparecer `(empty)`, significa que o dado não veio no webhook.
 
 Use o script de teste:
 
-```bash
+\`\`\`bash
 /tmp/test-webhooks.sh
-```
+\`\`\`
 
 Isso enviará webhooks de teste com TODOS os campos preenchidos.
 
@@ -117,7 +117,7 @@ Isso enviará webhooks de teste com TODOS os campos preenchidos.
 
 ## Exemplo de Webhook COMPLETO
 
-```json
+\`\`\`json
 {
   "transaction_id": "TRX-12345",
   "customer": {
@@ -143,7 +143,7 @@ Isso enviará webhooks de teste com TODOS os campos preenchidos.
   },
   "timestamp": "2024-12-04T03:00:00Z"
 }
-```
+\`\`\`
 
 ## Checklist de Verificação
 
