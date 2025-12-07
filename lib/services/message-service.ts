@@ -63,6 +63,29 @@ export class MessageService {
       const processedContent = parseMessage(message.content, variables)
 
       // Cria mensagem agendada
+      // Evita criar duplicatas: se já existe uma mensagem pendente para o
+      // mesmo tenant + phone + order + flow_message_id, pulamos a inserção.
+      const existing = await queryOne<{ id: string }>(
+        `SELECT id FROM scheduled_messages
+         WHERE tenant_id = $1
+           AND phone = $2
+           AND order_id = $3
+           AND flow_message_id = $4
+           AND status = 'pending'
+         LIMIT 1`,
+        [this.tenantId, customer.phone, order.id, message.id],
+      )
+
+      if (existing) {
+        if (isDebugMode) {
+          console.log(
+            `Skipping duplicate scheduled message (flow_message_id=${message.id}) for phone=${customer.phone}`,
+          )
+        }
+        // Mantemos a lista retornada consistente (não inserimos, mas não falhamos)
+        continue
+      }
+
       const scheduled = await insert<ScheduledMessage>("scheduled_messages", {
         tenant_id: this.tenantId,
         customer_id: customer.id,
