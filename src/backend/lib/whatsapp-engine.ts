@@ -897,7 +897,7 @@ async simulateTyping(to: string, text: string): Promise<void> {
     }
 
     try {
-      const media = await MessageMedia.fromUrl(message.mediaUrl)
+      const media = await MessageMedia.fromUrl(message.mediaUrl, { unsafeMime: true })
       // Resolve the correct chat ID format (LID or c.us)
       const chatId = await this.resolveChatId(message.to)
       const result = await this.client.sendMessage(chatId, media, { caption: message.content })
