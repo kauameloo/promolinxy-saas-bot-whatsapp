@@ -2,12 +2,7 @@
 // WHATSAPP ENGINE - Abstração para whatsapp-web.js
 // =====================================================
 
-import type {
-  WhatsAppMessage,
-  WhatsAppSessionInfo,
-  WhatsAppEventHandlers,
-  SendMessageResult,
-} from "./types"
+import type { WhatsAppMessage, WhatsAppSessionInfo, WhatsAppEventHandlers, SendMessageResult } from "./types"
 
 // Import whatsapp-web.js
 import { Client, LocalAuth, MessageMedia } from "whatsapp-web.js"
@@ -89,7 +84,7 @@ function getAuthDir(dataPath: string, sessionId: string): string {
 /**
  * Removes Chromium profile lock files that may have been left by a crashed process
  * This resolves the "profile appears to be in use by another Chromium process" error
- * 
+ *
  * Recursively searches all subdirectories to ensure complete cleanup
  */
 function removeChromiumLockFiles(authDir: string): void {
@@ -103,21 +98,20 @@ function removeChromiumLockFiles(authDir: string): void {
   function removeLockFilesRecursively(dir: string): void {
     try {
       if (!fs.existsSync(dir)) return
-      
+
       const entries = fs.readdirSync(dir, { withFileTypes: true })
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name)
-        
+
         if (entry.isDirectory()) {
           // Recursively process subdirectories
           removeLockFilesRecursively(fullPath)
         } else if (entry.isFile()) {
           // Check if this is a lock file
-          const isLockFile = 
-            CHROMIUM_LOCK_FILES.includes(entry.name) ||
-            LOCK_FILE_EXTENSIONS.some(ext => entry.name.endsWith(ext))
-          
+          const isLockFile =
+            CHROMIUM_LOCK_FILES.includes(entry.name) || LOCK_FILE_EXTENSIONS.some((ext) => entry.name.endsWith(ext))
+
           if (isLockFile) {
             try {
               fs.unlinkSync(fullPath)
@@ -143,11 +137,11 @@ function removeChromiumLockFiles(authDir: string): void {
 function checkSessionExists(dataPath: string, sessionId: string): boolean {
   const authDir = getAuthDir(dataPath, sessionId)
   const metadataPath = getMetadataPath(dataPath, sessionId)
-  
+
   // Check if LocalAuth session directory exists
   const localAuthExists = fs.existsSync(authDir)
   const metadataExists = fs.existsSync(metadataPath)
-  
+
   return localAuthExists || metadataExists
 }
 
@@ -155,23 +149,23 @@ function checkSessionExists(dataPath: string, sessionId: string): boolean {
  * Loads session metadata from file (static utility)
  */
 function loadMetadataFromFile(
-  dataPath: string, 
-  sessionId: string, 
-  encryptionKey?: string
+  dataPath: string,
+  sessionId: string,
+  encryptionKey?: string,
 ): { phoneNumber?: string; lastConnected?: string } | null {
   try {
     const metadataPath = getMetadataPath(dataPath, sessionId)
     if (!fs.existsSync(metadataPath)) return null
-    
+
     const encryptedData = fs.readFileSync(metadataPath, "utf8")
-    
+
     // Decrypt if encryption key is provided
     let data = encryptedData
     if (encryptionKey) {
       const encryption = new SessionEncryption(encryptionKey)
       data = encryption.decrypt(encryptedData)
     }
-    
+
     return JSON.parse(data)
   } catch (error) {
     console.error(`[WhatsApp Engine] Error loading session metadata for ${sessionId}:`, error)
@@ -195,32 +189,32 @@ class SessionEncryption {
 
   encrypt(data: string): string {
     if (!this.key) return data
-    
+
     const iv = crypto.randomBytes(16)
     const cipher = crypto.createCipheriv("aes-256-gcm", this.key, iv)
     let encrypted = cipher.update(data, "utf8", "hex")
     encrypted += cipher.final("hex")
     const authTag = cipher.getAuthTag()
-    
+
     // Format: iv:authTag:encryptedData
     return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted}`
   }
 
   decrypt(encryptedData: string): string {
     if (!this.key) return encryptedData
-    
+
     const parts = encryptedData.split(":")
     if (parts.length !== 3) return encryptedData // Not encrypted
-    
+
     const [ivHex, authTagHex, data] = parts
     const iv = Buffer.from(ivHex, "hex")
     const authTag = Buffer.from(authTagHex, "hex")
-    
+
     const decipher = crypto.createDecipheriv("aes-256-gcm", this.key, iv)
     decipher.setAuthTag(authTag)
     let decrypted = decipher.update(data, "hex", "utf8")
     decrypted += decipher.final("utf8")
-    
+
     return decrypted
   }
 }
@@ -230,7 +224,7 @@ class SessionEncryption {
  *
  * Esta classe fornece uma interface para o whatsapp-web.js
  * Em produção, integra com a biblioteca whatsapp-web.js real
- * 
+ *
  * Session Persistence Features:
  * - LocalAuth with per-tenant clientId for proper session isolation
  * - Session data backup to JSON for recovery
@@ -247,11 +241,11 @@ export class WhatsAppEngine {
   private client: Client | null = null
   private persistenceConfig: SessionPersistenceConfig
   private encryption: SessionEncryption
-  private reconnectAttempts: number = 0
+  private reconnectAttempts = 0
   private reconnectTimer: NodeJS.Timeout | null = null
   private lastHeartbeat: Date | null = null
   private heartbeatInterval: NodeJS.Timeout | null = null
-  private isInitializing: boolean = false
+  private isInitializing = false
   /** Cached client config built from env and defaults */
   private clientConfig: any | null = null
 
@@ -284,10 +278,10 @@ export class WhatsAppEngine {
       headless: true,
       args: Array.from(new Set([...(envArgs.length ? envArgs : defaultArgs)])),
       // Increase launch timeout to accommodate slow container startups
-      timeout: parseInt(process.env.PUPPETEER_LAUNCH_TIMEOUT || "60000", 10),
+      timeout: Number.parseInt(process.env.PUPPETEER_LAUNCH_TIMEOUT || "60000", 10),
     }
 
-    const dataPath = this.persistenceConfig?.dataPath || (process.env.WHATSAPP_SESSION_PATH || "./sessions")
+    const dataPath = this.persistenceConfig?.dataPath || process.env.WHATSAPP_SESSION_PATH || "./sessions"
 
     // Defer require to runtime to avoid build-time issues
     const wwebjs = require("whatsapp-web.js")
@@ -299,8 +293,8 @@ export class WhatsAppEngine {
         clientId: this.sessionId ? `session-${this.sessionId}` : undefined,
       }),
       takeoverOnConflict: true,
-      takeoverTimeoutMs: parseInt(process.env.WHATSAPP_TAKEOVER_TIMEOUT_MS || "60000", 10),
-      qrMaxRetries: parseInt(process.env.WHATSAPP_QR_MAX_RETRIES || "3", 10),
+      takeoverTimeoutMs: Number.parseInt(process.env.WHATSAPP_TAKEOVER_TIMEOUT_MS || "60000", 10),
+      qrMaxRetries: Number.parseInt(process.env.WHATSAPP_QR_MAX_RETRIES || "3", 10),
     }
 
     return this.clientConfig
@@ -322,7 +316,7 @@ export class WhatsAppEngine {
     this.handlers = handlers
     this.persistenceConfig = { ...DEFAULT_PERSISTENCE_CONFIG, ...config }
     this.encryption = new SessionEncryption(this.persistenceConfig.encryptionKey)
-    
+
     // Ensure session directory exists
     this.ensureSessionDirectory()
   }
@@ -343,7 +337,7 @@ export class WhatsAppEngine {
    */
   private saveSessionMetadata(): void {
     if (!this.persistenceConfig.enableBackup) return
-    
+
     try {
       const metadata = {
         sessionId: this.sessionId,
@@ -353,12 +347,10 @@ export class WhatsAppEngine {
         lastHeartbeat: this.lastHeartbeat?.toISOString(),
         version: "1.0",
       }
-      
+
       const data = JSON.stringify(metadata, null, 2)
-      const encryptedData = this.persistenceConfig.encryptionKey 
-        ? this.encryption.encrypt(data) 
-        : data
-      
+      const encryptedData = this.persistenceConfig.encryptionKey ? this.encryption.encrypt(data) : data
+
       const metadataPath = getMetadataPath(this.persistenceConfig.dataPath, this.sessionId)
       fs.writeFileSync(metadataPath, encryptedData, "utf8")
       console.log(`[WhatsApp Engine] Session metadata saved for ${this.sessionId}`)
@@ -371,11 +363,7 @@ export class WhatsAppEngine {
    * Loads session metadata for recovery
    */
   loadSessionMetadata(): { phoneNumber?: string; lastConnected?: string } | null {
-    return loadMetadataFromFile(
-      this.persistenceConfig.dataPath,
-      this.sessionId,
-      this.persistenceConfig.encryptionKey
-    )
+    return loadMetadataFromFile(this.persistenceConfig.dataPath, this.sessionId, this.persistenceConfig.encryptionKey)
   }
 
   /**
@@ -392,7 +380,7 @@ export class WhatsAppEngine {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval)
     }
-    
+
     this.heartbeatInterval = setInterval(() => {
       this.lastHeartbeat = new Date()
       if (this.status === "connected") {
@@ -420,14 +408,16 @@ export class WhatsAppEngine {
       console.log(`[WhatsApp Engine] Max reconnection attempts reached for ${this.sessionId}`)
       return
     }
-    
+
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
     }
-    
+
     const delay = this.persistenceConfig.reconnectDelay * Math.pow(2, this.reconnectAttempts)
-    console.log(`[WhatsApp Engine] Scheduling reconnect for ${this.sessionId} in ${delay}ms (attempt ${this.reconnectAttempts + 1})`)
-    
+    console.log(
+      `[WhatsApp Engine] Scheduling reconnect for ${this.sessionId} in ${delay}ms (attempt ${this.reconnectAttempts + 1})`,
+    )
+
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectAttempts++
       try {
@@ -465,18 +455,18 @@ export class WhatsAppEngine {
 
     console.log(`[WhatsApp Engine] Using LocalAuth dataPath: ${dataPath}, clientId: ${clientId}`)
     console.log(`[WhatsApp Engine] Existing session: ${this.hasExistingSession()}`)
-    
+
     // Remove stale Chromium lock files that may have been left by a crashed process
     // This prevents the "profile appears to be in use by another Chromium process" error
     const authDir = getAuthDir(dataPath, clientId)
     removeChromiumLockFiles(authDir)
-    
+
     // Load previous session metadata if available
     const metadata = this.loadSessionMetadata()
     if (metadata?.phoneNumber) {
       console.log(`[WhatsApp Engine] Previous session found for phone: ${metadata.phoneNumber}`)
     }
-    
+
     // Mark initializing to prevent concurrent sends while client starts
     this.isInitializing = true
 
@@ -530,10 +520,10 @@ export class WhatsAppEngine {
     // Handle ready event
     this.client.on("ready", async () => {
       this.status = "connected"
-      
+
       // Try multiple approaches to get the phone number
       let phoneNumber: string | null = null
-      
+
       // Approach 1: Get from client.info.wid.user
       const info = this.client?.info
       if (info?.wid?.user) {
@@ -549,14 +539,14 @@ export class WhatsAppEngine {
       else if (info?.me?.user) {
         phoneNumber = info.me.user
       }
-      
+
       this.phoneNumber = phoneNumber
       console.log(`[WhatsApp ${this.sessionId}] Ready - Phone: ${this.phoneNumber}`)
-      
+
       // Save session metadata for future recovery
       this.saveSessionMetadata()
       this.startHeartbeat()
-      
+
       // Call onReady handler with phone number or empty string fallback
       this.handlers.onReady?.(this.phoneNumber || "")
     })
@@ -581,7 +571,7 @@ export class WhatsAppEngine {
       console.log(`[WhatsApp ${this.sessionId}] Disconnected:`, reason)
       this.stopHeartbeat()
       this.handlers.onDisconnected?.(reason)
-      
+
       // Schedule reconnection if enabled and not a logout
       if (reason !== "LOGOUT") {
         this.scheduleReconnect()
@@ -614,7 +604,7 @@ export class WhatsAppEngine {
   /**
    * Resolves the correct chat ID format (LID or c.us) for a phone number
    * WhatsApp now requires @lid format for some phone numbers
-   * 
+   *
    * Note: This method should only be called when the client is connected,
    * as it relies on the WhatsApp Web API to retrieve LID information.
    */
@@ -635,11 +625,11 @@ export class WhatsAppEngine {
 
       // 1) Preferred: getContactLidAndPhone (returns lid when available)
       try {
-        if (clientAny && typeof clientAny.getContactLidAndPhone === 'function') {
+        if (clientAny && typeof clientAny.getContactLidAndPhone === "function") {
           const lidInfo = await clientAny.getContactLidAndPhone([phoneNumber])
           if (lidInfo && lidInfo.length > 0 && lidInfo[0]?.lid) {
             const lid = lidInfo[0].lid
-            if (typeof lid === 'string' && lid.includes('@')) {
+            if (typeof lid === "string" && lid.includes("@")) {
               console.log(`[WhatsApp Engine] Using LID format for ${phoneNumber}: ${lid}`)
               return lid
             }
@@ -651,12 +641,12 @@ export class WhatsAppEngine {
 
       // 2) Try getNumberId which may return an id object or null
       try {
-        if (clientAny && typeof clientAny.getNumberId === 'function') {
+        if (clientAny && typeof clientAny.getNumberId === "function") {
           const numId = await clientAny.getNumberId(phoneNumber)
           if (numId && (numId._serialized || numId.id)) {
             const idVal = numId._serialized || numId.id || String(numId)
             console.log(`[WhatsApp Engine] getNumberId resolved for ${phoneNumber}: ${idVal}`)
-            return idVal.includes('@') ? idVal : `${idVal}@c.us`
+            return idVal.includes("@") ? idVal : `${idVal}@c.us`
           }
         }
       } catch (e) {
@@ -665,18 +655,18 @@ export class WhatsAppEngine {
 
       // 3) Try to find contact via getContacts() and use its id
       try {
-        if (clientAny && typeof clientAny.getContacts === 'function') {
+        if (clientAny && typeof clientAny.getContacts === "function") {
           const contacts = await clientAny.getContacts()
           if (Array.isArray(contacts)) {
             const found = contacts.find((c: any) => {
-              const pn = (c?.phoneNumber || c?.number || c?.pn || '')
+              const pn = c?.phoneNumber || c?.number || c?.pn || ""
               // compare last digits to be more tolerant
-              return pn && pn.replace(/\D/g, '').endsWith(phoneNumber.replace(/\D/g, ''))
+              return pn && pn.replace(/\D/g, "").endsWith(phoneNumber.replace(/\D/g, ""))
             })
             if (found && found.id) {
               const idVal = found.id._serialized || found.id
               console.log(`[WhatsApp Engine] Found contact via getContacts for ${phoneNumber}: ${idVal}`)
-              return idVal.includes('@') ? idVal : `${idVal}@c.us`
+              return idVal.includes("@") ? idVal : `${idVal}@c.us`
             }
           }
         }
@@ -686,26 +676,27 @@ export class WhatsAppEngine {
 
       // 4) Try to find chat via getChats() and use its id
       try {
-        if (clientAny && typeof clientAny.getChats === 'function') {
+        if (clientAny && typeof clientAny.getChats === "function") {
           const chats = await clientAny.getChats()
           if (Array.isArray(chats)) {
             const foundChat = chats.find((ch: any) => {
               try {
                 const idStr = ch?.id?._serialized || ch?.id
-                return idStr && idStr.includes(phoneNumber.replace(/\D/g, ''))
-              } catch { return false }
+                return idStr && idStr.includes(phoneNumber.replace(/\D/g, ""))
+              } catch {
+                return false
+              }
             })
             if (foundChat && foundChat.id) {
               const idVal = foundChat.id._serialized || foundChat.id
               console.log(`[WhatsApp Engine] Found chat via getChats for ${phoneNumber}: ${idVal}`)
-              return idVal.includes('@') ? idVal : `${idVal}@c.us`
+              return idVal.includes("@") ? idVal : `${idVal}@c.us`
             }
           }
         }
       } catch (e) {
         console.warn(`[WhatsApp Engine] getChats search failed for ${phoneNumber}:`, e)
       }
-
     } catch (outer) {
       console.warn(`[WhatsApp Engine] Unexpected error during resolveChatId for ${phoneNumber}:`, outer)
     }
@@ -739,35 +730,45 @@ export class WhatsAppEngine {
         console.warn(`[WhatsApp Engine] sendMessage called but puppeteer page missing for ${this.sessionId}`)
         this.status = "disconnected"
         this.stopHeartbeat()
-        try { if (this.client) { await this.client.destroy(); } } catch (e) { console.warn(e) }
+        try {
+          if (this.client) {
+            await this.client.destroy()
+          }
+        } catch (e) {
+          console.warn(e)
+        }
         this.client = null
         this.scheduleReconnect()
-        return { success: false, error: "Puppeteer page indisponível. Reconectando, tente novamente em alguns segundos." }
+        return {
+          success: false,
+          error: "Puppeteer page indisponível. Reconectando, tente novamente em alguns segundos.",
+        }
       }
 
       // Resolve the correct chat ID format (LID or c.us)
       const chatId = await this.resolveChatId(message.to)
       const result = await this.client.sendMessage(chatId, message.content)
-      
-      console.log(
-        `[WhatsApp Engine] Message sent to ${message.to}: ${message.content.substring(0, 50)}...`
-      )
+
+      console.log(`[WhatsApp Engine] Message sent to ${message.to}: ${message.content.substring(0, 50)}...`)
 
       return {
         success: true,
         messageId: result.id._serialized,
       }
     } catch (error) {
-  console.error(`[WhatsApp Engine] Send message error:`, error)
+      console.error(`[WhatsApp Engine] Send message error:`, error)
 
       // Detect common puppeteer/page null errors coming from whatsapp-web.js
       const msg = error instanceof Error ? error.message : String(error)
-      if (msg.includes("reading 'evaluate'") || msg.includes("Cannot read properties of null") || msg.includes('evaluate')) {
+      if (
+        msg.includes("reading 'evaluate'") ||
+        msg.includes("Cannot read properties of null") ||
+        msg.includes("evaluate")
+      ) {
         // Mark session as disconnected and schedule a reconnect
         try {
           this.status = "disconnected"
           this.stopHeartbeat()
-          // Attempt graceful destroy and schedule reconnect
           if (this.client) {
             try {
               await this.client.destroy()
@@ -816,7 +817,7 @@ export class WhatsAppEngine {
       // Resolve the correct chat ID format (LID or c.us)
       const chatId = await this.resolveChatId(message.to)
       const result = await this.client.sendMessage(chatId, media, { caption: message.content })
-      
+
       console.log(`[WhatsApp Engine] Media sent to ${message.to}`)
 
       return {
@@ -826,7 +827,11 @@ export class WhatsAppEngine {
     } catch (error) {
       console.error(`[WhatsApp Engine] Send media error:`, error)
       const msg = error instanceof Error ? error.message : String(error)
-      if (msg.includes("reading 'evaluate'") || msg.includes("Cannot read properties of null") || msg.includes('evaluate')) {
+      if (
+        msg.includes("reading 'evaluate'") ||
+        msg.includes("Cannot read properties of null") ||
+        msg.includes("evaluate")
+      ) {
         try {
           this.status = "disconnected"
           this.stopHeartbeat()
@@ -855,32 +860,31 @@ export class WhatsAppEngine {
     }
   }
 
-/**
- * Envia botões nativos do WhatsApp
- */
-async sendButtonsMessage(opts: { to: string; message: any }): Promise<SendMessageResult> {
-  try {
-    if (!this.client) {
-      return { success: false, error: "WhatsApp client não inicializado" }
-    }
+  /**
+   * Envia botões nativos do WhatsApp
+   */
+  async sendButtonsMessage(opts: { to: string; message: any }): Promise<SendMessageResult> {
+    try {
+      if (!this.client) {
+        return { success: false, error: "WhatsApp client não inicializado" }
+      }
 
-    const chatId = await this.resolveChatId(opts.to)
+      const chatId = await this.resolveChatId(opts.to)
 
-    const result = await this.client.sendMessage(chatId, opts.message)
+      const result = await this.client.sendMessage(chatId, opts.message)
 
-    return {
-      success: true,
-      messageId: result?.id?._serialized ?? undefined,
-    }
-  } catch (error) {
-    console.error("[WhatsAppEngine] Erro ao enviar botões:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Erro desconhecido",
+      return {
+        success: true,
+        messageId: result?.id?._serialized ?? undefined,
+      }
+    } catch (error) {
+      console.error("[WhatsAppEngine] Erro ao enviar botões:", error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Erro desconhecido",
+      }
     }
   }
-}
-
 
   /**
    * Obtém o status atual da sessão
@@ -916,14 +920,14 @@ async sendButtonsMessage(opts: { to: string; message: any }): Promise<SendMessag
    * Desconecta a sessão
    * @param preserveSession - If true, keeps session data for future restoration
    */
-  async disconnect(preserveSession: boolean = false): Promise<void> {
+  async disconnect(preserveSession = false): Promise<void> {
     const client = this.client
     this.client = null
-    
+
     // Cancel any pending reconnection
     this.cancelReconnect()
     this.stopHeartbeat()
-    
+
     if (client) {
       try {
         if (!preserveSession) {
@@ -999,12 +1003,17 @@ class WhatsAppManager {
   }
 
   /**
+   * Gets all active engines as [sessionId, engine] pairs
+   * Used by webhook handlers to find the appropriate engine for a phone number
+   */
+  getAllEngines(): Array<[string, WhatsAppEngine]> {
+    return Array.from(this.engines.entries())
+  }
+
+  /**
    * Creates a new WhatsApp engine with session persistence
    */
-  async createEngine(
-    sessionId: string,
-    handlers: WhatsAppEventHandlers = {}
-  ): Promise<WhatsAppEngine> {
+  async createEngine(sessionId: string, handlers: WhatsAppEventHandlers = {}): Promise<WhatsAppEngine> {
     if (this.engines.has(sessionId)) {
       return this.engines.get(sessionId)!
     }
@@ -1019,7 +1028,7 @@ class WhatsAppManager {
    * @param sessionId - The session ID
    * @param preserveSession - If true, keeps session data for future restoration
    */
-  async removeEngine(sessionId: string, preserveSession: boolean = false): Promise<void> {
+  async removeEngine(sessionId: string, preserveSession = false): Promise<void> {
     const engine = this.engines.get(sessionId)
     if (engine) {
       await engine.disconnect(preserveSession)
@@ -1057,11 +1066,12 @@ class WhatsAppManager {
     try {
       const sessionsPath = this.config.dataPath
       if (!fs.existsSync(sessionsPath)) return []
-      
-      const dirs = fs.readdirSync(sessionsPath, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory() && dirent.name.startsWith("session-"))
-        .map(dirent => dirent.name.replace("session-", ""))
-      
+
+      const dirs = fs
+        .readdirSync(sessionsPath, { withFileTypes: true })
+        .filter((dirent) => dirent.isDirectory() && dirent.name.startsWith("session-"))
+        .map((dirent) => dirent.name.replace("session-", ""))
+
       return dirs
     } catch (error) {
       console.error("[WhatsApp Manager] Error listing persisted sessions:", error)
@@ -1076,17 +1086,17 @@ class WhatsAppManager {
     try {
       const sessionDir = getSessionDir(this.config.dataPath, sessionId)
       const authDir = getAuthDir(this.config.dataPath, sessionId)
-      
+
       // Remove session directory
       if (fs.existsSync(sessionDir)) {
         fs.rmSync(sessionDir, { recursive: true })
       }
-      
+
       // Remove LocalAuth directory
       if (fs.existsSync(authDir)) {
         fs.rmSync(authDir, { recursive: true })
       }
-      
+
       console.log(`[WhatsApp Manager] Deleted session data for ${sessionId}`)
       return true
     } catch (error) {
@@ -1099,12 +1109,12 @@ class WhatsAppManager {
    * Cleans up legacy session data from the old shared clientId naming.
    * Previously, all tenants shared a single "bot-session" clientId which caused
    * Chromium profile lock conflicts. This method removes that legacy data.
-   * 
+   *
    * This operation is safe to call multiple times and is idempotent.
-   * 
+   *
    * @returns true if cleanup was performed, false if no legacy data found or on error
    * @throws Never throws - errors are logged and return false
-   * 
+   *
    * @example
    * const cleaned = await manager.cleanupLegacySessionData()
    * if (cleaned) {
@@ -1116,9 +1126,9 @@ class WhatsAppManager {
     try {
       const legacyAuthDir = getAuthDir(this.config.dataPath, legacyClientId)
       const legacySessionDir = getSessionDir(this.config.dataPath, legacyClientId)
-      
+
       let cleaned = false
-      
+
       // Remove legacy auth directory if it exists
       if (fs.existsSync(legacyAuthDir)) {
         console.log(`[WhatsApp Manager] Cleaning up legacy auth directory: ${legacyAuthDir}`)
@@ -1132,7 +1142,7 @@ class WhatsAppManager {
           console.error(`[WhatsApp Manager] Error removing legacy auth directory:`, rmError)
         }
       }
-      
+
       // Remove legacy session directory if it exists
       if (fs.existsSync(legacySessionDir)) {
         console.log(`[WhatsApp Manager] Cleaning up legacy session directory: ${legacySessionDir}`)
@@ -1143,18 +1153,18 @@ class WhatsAppManager {
           console.error(`[WhatsApp Manager] Error removing legacy session directory:`, rmError)
         }
       }
-      
+
       // Also clean up any orphaned lock files in the entire .wwebjs_auth directory
       const authBaseDir = path.join(this.config.dataPath, WWEBJS_AUTH_DIR)
       if (fs.existsSync(authBaseDir)) {
         console.log(`[WhatsApp Manager] Scanning for orphaned lock files in: ${authBaseDir}`)
         removeChromiumLockFiles(authBaseDir)
       }
-      
+
       if (cleaned) {
         console.log(`[WhatsApp Manager] Legacy session data cleanup completed`)
       }
-      
+
       return cleaned
     } catch (error) {
       // Log the error but return false to indicate cleanup was not completed

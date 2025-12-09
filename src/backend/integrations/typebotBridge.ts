@@ -4,9 +4,9 @@
 
 import { getTypebotClient, type TypebotClient, type ParsedTypebotMessage, type TypebotResponse } from "./typebotClient"
 import { getRedisSessionManager, type RedisSessionManager, type TypebotSessionData } from "./redisSession"
+import { sendZenderButtons } from "./zender"
 import type { WhatsAppEngine } from "../lib/whatsapp-engine"
 import type { SendMessageResult } from "../lib/types"
-import { Buttons } from "whatsapp-web.js"
 
 /**
  * Configuração do Typebot Bridge
@@ -248,60 +248,40 @@ export class TypebotBridge {
     }
 
     const chatId = phone.includes("@") ? phone : `${phone}@c.us`
+    const normalizedPhone = this.normalizePhone(phone)
 
     // Limpa mapeamentos anteriores para este telefone
-    this.buttonMappings.delete(phone)
+    this.buttonMappings.delete(normalizedPhone)
 
-    // Até 3 opções: tenta usar botões nativos do WhatsApp
-    // Mais de 3: envia lista numerada
-    if (message.buttons.length <= this.config.maxButtonsForNativeButtons) {
-      // Tenta enviar como botões nativos
+    if (process.env.ZENDER_TOKEN) {
       try {
-        const buttonResult = await this.sendNativeButtons(engine, chatId, message.buttons)
-        if (buttonResult.success) {
-          // Salva mapeamento de texto -> id
-          this.saveButtonMapping(phone, message.buttons)
-          return buttonResult
+        this.log(`Tentando enviar botões via Zender para ${normalizedPhone}`)
+
+        const zenderResult = await sendZenderButtons({
+          to: normalizedPhone,
+          message: message.content || "Escolha uma opção:",
+          buttons: message.buttons,
+          session: process.env.ZENDER_SESSION || "default",
+        })
+
+        if (zenderResult.success) {
+          this.log(`Botões enviados via Zender com sucesso: ${zenderResult.messageId}`)
+          // Salva mapeamento de texto -> id para quando usuário clicar
+          this.saveButtonMapping(normalizedPhone, message.buttons)
+          return { success: true, messageId: zenderResult.messageId }
+        } else {
+          this.log(`Zender falhou: ${JSON.stringify(zenderResult.error)}, usando fallback...`)
         }
       } catch (error) {
-        console.warn("[TypebotBridge] Botões nativos falharam, usando lista:", error)
+        console.error("[TypebotBridge] Erro ao enviar via Zender:", error)
+        this.log(`Erro no Zender, usando fallback lista numerada`)
       }
+    } else {
+      this.log(`ZENDER_TOKEN não configurado, usando lista numerada`)
     }
 
-    // Fallback: lista numerada
-    return await this.sendNumberedList(engine, chatId, phone, message.buttons)
+    return await this.sendNumberedList(engine, chatId, normalizedPhone, message.buttons)
   }
-
-  /**
-   * Tenta enviar botões nativos do WhatsApp
-   * Nota: Botões nativos têm suporte limitado e podem não funcionar em todas as contas
-   */
-  private async sendNativeButtons(
-    engine: WhatsAppEngine,
-    chatId: string,
-    buttons: Array<{ id: string; text: string }>
-  ): Promise<SendMessageResult> {
-    try {
-      const buttonRows = buttons.map(btn => ({ body: btn.text }))
-
-      const buttonMessage = new Buttons(
-        "Escolha uma opção:",
-        buttonRows,
-        "",
-        ""
-      )
-
-      // Agora usamos a função oficial do engine
-      return await engine.sendButtonsMessage({
-        to: chatId,
-        message: buttonMessage,
-      })
-    } catch (error) {
-      console.error("[TypebotBridge] Erro ao enviar botões nativos:", error)
-      throw error
-    }
-  }
-
 
   /**
    * Envia opções como lista numerada
