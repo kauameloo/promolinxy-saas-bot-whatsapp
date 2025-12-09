@@ -214,6 +214,26 @@ export class RedisSessionManager {
   }
 
   /**
+   * Remove TODAS as sessões do Typebot no Redis
+   */
+  async clearAllSessions(): Promise<void> {
+    await this.ensureConnected()
+
+    try {
+      const keys = await this.client!.keys(`${this.config.keyPrefix}*`)
+      if (keys.length > 0) {
+        await this.client!.del(keys)
+        console.log(`[RedisSession] Todas as sessões foram resetadas (${keys.length} removidas)`)
+      } else {
+        console.log("[RedisSession] Nenhuma sessão para limpar")
+      }
+    } catch (error) {
+      console.error("[RedisSession] Erro ao limpar todas as sessões:", error)
+    }
+  }
+
+
+  /**
    * Fecha a conexão com o Redis
    */
   async disconnect(): Promise<void> {
@@ -246,6 +266,7 @@ export async function resetRedisSession(phone: string): Promise<boolean> {
   const manager = getRedisSessionManager()
   return await manager.deleteSession(phone)
 }
+
 
 export async function disconnectRedis(): Promise<void> {
   if (redisSessionInstance) {

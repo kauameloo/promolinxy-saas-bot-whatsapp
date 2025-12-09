@@ -66,12 +66,18 @@ export class TypebotBridge {
   async initialize(): Promise<void> {
     try {
       await this.redisSession.connect()
+
+      // 🔥 Reset total ao subir o serviço
+      await this.redisSession.clearAllSessions()
+      console.log("[TypebotBridge] Todas as sessões foram resetadas no startup")
+
       console.log("[TypebotBridge] Conexões inicializadas")
     } catch (error) {
       console.error("[TypebotBridge] Erro ao inicializar:", error)
       throw error
     }
   }
+
 
   /**
    * Processa uma mensagem recebida do WhatsApp
@@ -101,7 +107,52 @@ export class TypebotBridge {
       // Verifica se existe sessão no Redis
       const existingSession = await this.redisSession.getSession(normalizedPhone)
 
+      
       let typebotResponse: TypebotResponse
+
+// 🔥 EXPIRAÇÃO INTELIGENTE DE SESSÃO (ex: 30 minutos sem falar = nova sessão)
+if (existingSession) {
+  const last = new Date(existingSession.lastUsedAt).getTime();
+  const now = Date.now();
+  const diffMinutes = (now - last) / 1000 / 60;
+
+  if (diffMinutes > 30) {
+    this.log(`Sessão antiga detectada (${diffMinutes.toFixed(1)} min). Iniciando nova sessão.`);
+
+    // Apaga sessão antiga
+    await this.redisSession.deleteSession(normalizedPhone);
+
+    // Inicia nova sessão
+    const newSession = await this.startNewSession(normalizedPhone, flowId);
+
+    result.isNewSession = true;
+    result.sessionId = newSession.sessionId;
+
+    await this.redisSession.saveSession(normalizedPhone, {
+      sessionId: newSession.sessionId,
+      flowId: flowId || this.typebotClient.getConfig().defaultFlowId,
+      lastUsedAt: new Date().toISOString(),
+      phoneNumber: normalizedPhone,
+    });
+
+    typebotResponse = newSession;
+
+    // IMPORTANTE: ir direto para envio de mensagens
+    const parsedMessages = this.typebotClient.parseMessages(typebotResponse);
+    for (const msg of parsedMessages) {
+      await this.sendTypebotMessageToWhatsApp(engine, normalizedPhone, msg);
+    }
+
+    return {
+      success: true,
+      messagesSent: parsedMessages.length,
+      errors: [],
+      isNewSession: true,
+      sessionId: newSession.sessionId,
+    };
+  }
+}
+
 
       if (existingSession) {
         // Sessão existente - continua chat
