@@ -855,6 +855,33 @@ export class WhatsAppEngine {
     }
   }
 
+/**
+ * Envia botões nativos do WhatsApp
+ */
+async sendButtonsMessage(opts: { to: string; message: any }): Promise<SendMessageResult> {
+  try {
+    if (!this.client) {
+      return { success: false, error: "WhatsApp client não inicializado" }
+    }
+
+    const chatId = await this.resolveChatId(opts.to)
+
+    const result = await this.client.sendMessage(chatId, opts.message)
+
+    return {
+      success: true,
+      messageId: result?.id?._serialized ?? undefined,
+    }
+  } catch (error) {
+    console.error("[WhatsAppEngine] Erro ao enviar botões:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro desconhecido",
+    }
+  }
+}
+
+
   /**
    * Obtém o status atual da sessão
    */

@@ -279,40 +279,29 @@ export class TypebotBridge {
   private async sendNativeButtons(
     engine: WhatsAppEngine,
     chatId: string,
-    buttons: Array<{ id: string; text: string }>,
+    buttons: Array<{ id: string; text: string }>
   ): Promise<SendMessageResult> {
     try {
-      // Cria array de botões no formato esperado pelo whatsapp-web.js
-      const buttonRows = buttons.map((btn) => ({ body: btn.text }))
+      const buttonRows = buttons.map(btn => ({ body: btn.text }))
 
-      // Cria a mensagem com botões
-      // Formato: new Buttons(body, buttons, title?, footer?)
       const buttonMessage = new Buttons(
-        "Escolha uma opção:", // Body da mensagem
-        buttonRows, // Array de botões [{body: "texto"}]
-        "", // Title (opcional)
-        "", // Footer (opcional)
+        "Escolha uma opção:",
+        buttonRows,
+        "",
+        ""
       )
 
-      // Acessa o client diretamente do engine para enviar
-      const client = (engine as any).client
-      if (!client) {
-        throw new Error("WhatsApp client não disponível")
-      }
-
-      const result = await client.sendMessage(chatId, buttonMessage)
-
-      console.log("[TypebotBridge] Botões nativos enviados com sucesso")
-      return {
-        success: true,
-        messageId: result?.id?._serialized || result?.id?.id,
-      }
+      // Agora usamos a função oficial do engine
+      return await engine.sendButtonsMessage({
+        to: chatId,
+        message: buttonMessage,
+      })
     } catch (error) {
       console.error("[TypebotBridge] Erro ao enviar botões nativos:", error)
-      // Propaga o erro para que o fallback seja usado
       throw error
     }
   }
+
 
   /**
    * Envia opções como lista numerada

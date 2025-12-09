@@ -58,6 +58,7 @@ export interface TypebotResponse {
   input?: {
     id: string
     type: string
+    items?: Array<{ id: string; content: string }> // ← adicionamos isso
     options?: { items: Array<{ id: string; content: string }> }
   }
   clientSideActions?: Array<{
@@ -286,13 +287,18 @@ export class TypebotClient {
     }
 
     // Tratar input de escolha (botões)
-    if (response.input?.type === "choice input" && response.input.options?.items) {
-      const buttons = response.input.options.items.map((item) => ({
-        id: item.id,
-        text: item.content,
-      }))
+    if (response.input?.type === "choice input") {
+      const items =
+        response.input.items ??          // ← correto para Typebot moderno
+        response.input.options?.items ?? // ← compatibilidade com versões antigas
+        []
 
-      if (buttons.length > 0) {
+      if (items.length > 0) {
+        const buttons = items.map((item: { id: string; content: string }) => ({
+          id: item.id,
+          text: item.content,
+        }))
+
         parsed.push({
           type: "buttons",
           content: "",
