@@ -398,14 +398,24 @@ app.post("/api/zender/webhook", async (req: Request, res: Response) => {
       console.log(`[Zender Webhook] Botão clicado: ${selectedId} por ${phone}`);
 
       // Escolhe engine ativo
-      const engines = whatsappManager.getAllEngines();
+// Tenta identificar o tenant pelo session enviado pelo Zender
+const tenantId = body?.session;
 
-      if (engines.length === 0) {
-        console.warn("[Zender Webhook] Nenhum engine WhatsApp ativo");
-        return res.status(400).json({ success: false, error: "No active WhatsApp engine" });
-      }
+if (!tenantId) {
+  console.warn("[Zender Webhook] session não enviada pelo Zender");
+  return res.status(400).json({ success: false, error: "Missing session/tenantId" });
+}
 
-      const [tenantId, engine] = engines[0];
+const engine = whatsappManager.getEngine(tenantId);
+
+if (!engine) {
+  console.warn("[Zender Webhook] Nenhum engine encontrado para tenant:", tenantId);
+  return res.status(400).json({
+    success: false,
+    error: `Engine not found for tenant ${tenantId}`
+  });
+}
+
 
       try {
         const result = await typebotBridge.processIncomingMessage(

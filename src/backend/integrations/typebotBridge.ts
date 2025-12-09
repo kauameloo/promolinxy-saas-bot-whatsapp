@@ -131,12 +131,38 @@ export class TypebotBridge {
       }
 
       // Salva/atualiza sessão no Redis
-      await this.redisSession.saveSession(normalizedPhone, {
-        sessionId: typebotResponse.sessionId,
-        flowId: flowId || this.typebotClient.getConfig().defaultFlowId,
-        lastUsedAt: new Date().toISOString(),
-        phoneNumber: normalizedPhone,
-      })
+// Salva/atualiza sessão no Redis
+if (typebotResponse.sessionId) {
+  // Apenas startChat retorna sessionId
+  await this.redisSession.saveSession(normalizedPhone, {
+    sessionId: typebotResponse.sessionId,
+    flowId: flowId || this.typebotClient.getConfig().defaultFlowId,
+    lastUsedAt: new Date().toISOString(),
+    phoneNumber: normalizedPhone,
+  })
+  this.log(`[RedisSession] Sessão atualizada: ${typebotResponse.sessionId}`)
+} else {
+  // continueChat NÃO retorna sessionId → manter sessão atual
+  const existing = await this.redisSession.getSession(normalizedPhone)
+  if (existing?.sessionId) {
+    this.log(`[RedisSession] Mantendo sessão atual: ${existing.sessionId}`)
+    await this.redisSession.saveSession(normalizedPhone, {
+      ...existing,
+      lastUsedAt: new Date().toISOString(),
+    })
+  } else {
+    // Isso só acontece em erro, então forçamos nova sessão
+    this.log(`[RedisSession] Nenhuma sessão encontrada, forçando nova sessão`)
+    const newSession = await this.startNewSession(normalizedPhone, flowId)
+    await this.redisSession.saveSession(normalizedPhone, {
+      sessionId: newSession.sessionId,
+      flowId: flowId || this.typebotClient.getConfig().defaultFlowId,
+      lastUsedAt: new Date().toISOString(),
+      phoneNumber: normalizedPhone,
+    })
+  }
+}
+
 
       // Parseia e envia as mensagens
       const parsedMessages = this.typebotClient.parseMessages(typebotResponse)
