@@ -330,26 +330,22 @@ export class TypebotBridge {
   /**
    * Resolve input do usuário (número ou texto) para ID do botão
    */
-  private resolveButtonInput(phone: string, input: string): string {
-    const mapping = this.buttonMappings.get(phone)
-    if (!mapping) {
-      return input // Sem mapeamento, retorna input original
-    }
+private resolveButtonInput(phone: string, input: string): string {
+  const mapping = this.buttonMappings.get(phone)
+  if (!mapping) return input
 
-    const normalizedInput = input.toLowerCase().trim()
+  const normalized = input.toLowerCase().trim()
 
-    // Tenta encontrar pelo número ou texto
-    const resolvedId = mapping.get(normalizedInput) || mapping.get(input)
-
-    if (resolvedId) {
-      this.log(`Input "${input}" resolvido para button ID: ${resolvedId}`)
-      // Limpa o mapeamento após uso
-      this.buttonMappings.delete(phone)
-      return resolvedId
-    }
-
-    return input
+  const id = mapping.get(normalized) || mapping.get(input)
+  if (id) {
+    this.log(`Input resolvido para ID: ${id}`)
+    this.buttonMappings.delete(phone)
+    return id
   }
+
+  return input
+}
+
 
   /**
    * Normaliza número de telefone

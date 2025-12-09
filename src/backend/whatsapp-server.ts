@@ -365,69 +365,82 @@ app.post("/api/whatsapp/cleanup-legacy", async (req: Request, res: Response) => 
 
 app.post("/api/zender/webhook", async (req: Request, res: Response) => {
   try {
-    const body = req.body
+    const body = req.body;
 
-    console.log("[Zender Webhook] Recebido:", JSON.stringify(body, null, 2))
+    console.log("[Zender Webhook] Recebido:", JSON.stringify(body, null, 2));
 
-    // Verifica se é uma resposta de botão
-    if (body.type === "buttons_response" && body.buttons_response) {
-      const selectedId = body.buttons_response.selectedId
-      const phone = (body.from || "").replace("@c.us", "").replace(/\D/g, "")
+    // ------------------------------------------------------------
+    // GARANTE QUE O TYPEBOTBRIDGE EXISTE
+    // ------------------------------------------------------------
+    if (!typebotBridge) {
+      console.warn("[Zender Webhook] TypebotBridge não inicializado");
+      return res.status(500).json({
+        success: false,
+        error: "TypebotBridge not initialized"
+      });
+    }
+
+    // ------------------------------------------------------------
+    // FORMATO NOVO DO ZENDER: event = "button_click"
+    // ------------------------------------------------------------
+    if (body?.event === "button_click" && body?.data?.selectedId) {
+      const selectedId = body.data.selectedId;
+
+      const phone = (body?.data?.from || "")
+        .replace("@c.us", "")
+        .replace(/\D/g, "");
 
       if (!phone || !selectedId) {
-        console.warn("[Zender Webhook] Dados incompletos:", { phone, selectedId })
-        return res.status(400).json({ success: false, error: "Missing phone or selectedId" })
+        console.warn("[Zender Webhook] Dados incompletos:", { phone, selectedId });
+        return res.status(400).json({ success: false, error: "Missing phone or selectedId" });
       }
 
-      console.log(`[Zender Webhook] Botão clicado: ${selectedId} por ${phone}`)
+      console.log(`[Zender Webhook] Botão clicado: ${selectedId} por ${phone}`);
 
-      // Processa via TypebotBridge
-      if (typebotBridge) {
-        // Encontra o tenant/engine ativo para este telefone
-        // Por enquanto, usa o primeiro engine disponível
-        const engines = whatsappManager.getAllEngines()
+      // Escolhe engine ativo
+      const engines = whatsappManager.getAllEngines();
 
-        if (engines.length > 0) {
-          const [tenantId, engine] = engines[0]
+      if (engines.length === 0) {
+        console.warn("[Zender Webhook] Nenhum engine WhatsApp ativo");
+        return res.status(400).json({ success: false, error: "No active WhatsApp engine" });
+      }
 
-          try {
-            const result = await typebotBridge.processIncomingMessage(
-              engine,
-              phone,
-              selectedId, // O ID do botão é enviado como input para o Typebot
-            )
+      const [tenantId, engine] = engines[0];
 
-            console.log(`[Zender Webhook] Typebot processou: ${result.messagesSent} mensagens enviadas`)
+      try {
+        const result = await typebotBridge.processIncomingMessage(
+          engine,
+          phone,
+          selectedId
+        );
 
-            return res.json({
-              success: true,
-              processed: true,
-              messagesSent: result.messagesSent,
-            })
-          } catch (error) {
-            console.error("[Zender Webhook] Erro ao processar via Typebot:", error)
-            return res.status(500).json({ success: false, error: "Error processing button click" })
-          }
-        } else {
-          console.warn("[Zender Webhook] Nenhum engine WhatsApp ativo")
-          return res.status(400).json({ success: false, error: "No active WhatsApp engine" })
-        }
-      } else {
-        console.warn("[Zender Webhook] TypebotBridge não inicializado")
-        return res.status(500).json({ success: false, error: "TypebotBridge not initialized" })
+        console.log(`[Zender Webhook] Typebot processou: ${result.messagesSent} mensagens enviadas`);
+
+        return res.json({
+          success: true,
+          processed: true,
+          messagesSent: result.messagesSent
+        });
+      } catch (error) {
+        console.error("[Zender Webhook] Erro ao processar via Typebot:", error);
+        return res.status(500).json({ success: false, error: "Error processing button click" });
       }
     }
 
-    // Outros tipos de mensagem do Zender (texto, mídia, etc.)
-    // Podem ser processados aqui no futuro se necessário
-    console.log(`[Zender Webhook] Tipo não processado: ${body.type}`)
+    // ------------------------------------------------------------
+    // IGNORA EVENTOS QUE NÃO SÃO CLIQUE DE BOTÃO
+    // ------------------------------------------------------------
+    console.log(`[Zender Webhook] Tipo não processado: ${body.event || body.type}`);
 
-    return res.json({ success: true, processed: false, reason: "Type not handled" })
+    return res.json({ success: true, processed: false, reason: "Type not handled" });
+
   } catch (error) {
-    console.error("[Zender Webhook] Erro:", error)
-    return res.status(500).json({ success: false, error: "Internal server error" })
+    console.error("[Zender Webhook] Erro:", error);
+    return res.status(500).json({ success: false, error: "Internal server error" });
   }
-})
+});
+
+
 
 // =====================================================
 // TYPEBOT ROUTES - Rotas para gerenciamento do Typebot
