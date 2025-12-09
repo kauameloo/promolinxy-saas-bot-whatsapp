@@ -144,3 +144,34 @@ export interface SendMessageResult {
   messageId?: string
   error?: string
 }
+
+// =====================================================
+// WHATSAPP ENGINE PUBLIC INTERFACE (usada pelo TypebotBridge)
+// =====================================================
+
+export interface WhatsAppEngine {
+  sendMessage(params: {
+    to: string
+    content: string
+  }): Promise<SendMessageResult>
+
+  sendMediaMessage(params: {
+    to: string
+    content?: string
+    mediaUrl: string
+    mediaType: "image" | "video" | "audio" | "document"
+  }): Promise<SendMessageResult>
+
+  sendButtonsMessage?(params: {
+    to: string
+    message: any
+  }): Promise<SendMessageResult>
+
+  /**
+   * Suporte para simular "digitando...", "gravando..." etc.
+   */
+  sendPresenceUpdate(
+    type: "composing" | "paused" | "recording",
+    chatId: string
+  ): Promise<void>
+}

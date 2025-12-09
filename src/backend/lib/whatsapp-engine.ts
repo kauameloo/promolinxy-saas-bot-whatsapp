@@ -60,6 +60,54 @@ const DEFAULT_PERSISTENCE_CONFIG: SessionPersistenceConfig = {
 // SESSION UTILITY FUNCTIONS
 // =====================================================
 
+function deepCleanChromiumLocks(baseDir: string) {
+  const patterns = [
+    "SingletonLock",
+    "SingletonCookie",
+    "SingletonSocket",
+    "Singleton*",
+    "LOCK",
+    "*.lock",
+    "*.LOCK",
+    "lockfile",
+    "LOCKFILE",
+  ];
+
+  function deleteIfMatch(fullPath: string, name: string) {
+    for (const pattern of patterns) {
+      const regex = new RegExp("^" + pattern.replace("*", ".*") + "$", "i");
+      if (regex.test(name)) {
+        try {
+          fs.unlinkSync(fullPath);
+          console.log(`[WhatsAppEngine] Deleted lock: ${fullPath}`);
+        } catch (e) {
+          console.warn(`[WhatsAppEngine] Could not delete lock: ${fullPath}`, e);
+        }
+        return;
+      }
+    }
+  }
+
+  function recurse(dir: string) {
+    if (!fs.existsSync(dir)) return;
+
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        recurse(full);
+      } else {
+        deleteIfMatch(full, entry.name);
+      }
+    }
+  }
+
+  recurse(baseDir);
+}
+
+
+
 /**
  * Gets the session-specific directory path
  */
@@ -461,6 +509,13 @@ export class WhatsAppEngine {
     const authDir = getAuthDir(dataPath, clientId)
     removeChromiumLockFiles(authDir)
 
+    // 🔥 Remove locks do navegador (onde o Chromium trava)
+    const sessionDir = getSessionDir(dataPath, clientId);
+
+    // limpeza agressiva
+    deepCleanChromiumLocks(sessionDir);
+
+
     // Load previous session metadata if available
     const metadata = this.loadSessionMetadata()
     if (metadata?.phoneNumber) {
@@ -707,6 +762,34 @@ export class WhatsAppEngine {
   }
 
   /**
+ * Simula o "digitando..." no WhatsApp
+ */
+async simulateTyping(to: string, text: string): Promise<void> {
+  if (!this.client) return;
+
+  try {
+    const chatId = await this.resolveChatId(to);
+
+    const chat = await this.client.getChatById(chatId);
+
+    if (!chat?.sendStateTyping || !chat?.clearState) {
+      console.warn("[Typing] Método de estado de digitação não disponível nesta versão.");
+      return;
+    }
+
+    // tempo proporcional ao tamanho da mensagem
+    const typingTime = Math.min(5000, 800 + text.length * 30);
+
+    await chat.sendStateTyping();
+    await new Promise((resolve) => setTimeout(resolve, typingTime));
+    await chat.clearState();
+  } catch (err) {
+    console.error("[Typing] Erro ao simular digitando:", err);
+  }
+}
+
+
+  /**
    * Envia uma mensagem de texto
    */
   async sendMessage(message: WhatsAppMessage): Promise<SendMessageResult> {
@@ -744,6 +827,7 @@ export class WhatsAppEngine {
           error: "Puppeteer page indisponível. Reconectando, tente novamente em alguns segundos.",
         }
       }
+      await this.simulateTyping(message.to, message.content);
 
       // Resolve the correct chat ID format (LID or c.us)
       const chatId = await this.resolveChatId(message.to)

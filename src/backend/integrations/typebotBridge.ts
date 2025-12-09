@@ -78,6 +78,25 @@ export class TypebotBridge {
     }
   }
 
+/**
+ * Simula "digitando..." antes de enviar mensagens
+ */
+private async simulateTyping(engine: WhatsAppEngine, chatId: string, text: string): Promise<void> {
+  try {
+    // O método simulateTyping do engine já resolve o chatId sozinho
+    await engine.simulateTyping(chatId, text);
+
+    // tempo proporcional ao tamanho
+    const typingTime = Math.min(3000, 500 + text.length * 30);
+    await new Promise((resolve) => setTimeout(resolve, typingTime));
+
+  } catch (err) {
+    console.error("[TypingSimulation] Erro ao simular digitando:", err);
+  }
+}
+
+
+
 
   /**
    * Processa uma mensagem recebida do WhatsApp
@@ -285,10 +304,15 @@ if (typebotResponse.sessionId) {
 
     switch (message.type) {
       case "text":
+        if (message.content) {
+          await this.simulateTyping(engine, chatId, message.content)
+        }
+
         return await engine.sendMessage({
           to: chatId,
           content: message.content,
         })
+
 
       case "image":
       case "video":
@@ -334,6 +358,8 @@ if (typebotResponse.sessionId) {
       try {
         this.log(`Tentando enviar botões via Zender para ${normalizedPhone}`)
 
+        await this.simulateTyping(engine, chatId, message.content || "...")
+        
         const zenderResult = await sendZenderButtons({
           to: normalizedPhone,
           message: message.content || "Escolha uma opção:",
