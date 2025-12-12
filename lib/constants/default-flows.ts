@@ -373,13 +373,26 @@ export const KIRVANO_EVENT_COLORS: Record<KirvanoEventType, string> = {
 
 /**
  * Mapeamento de eventos Kirvano para eventos Cakto (para reutilizar fluxos)
+ * 
+ * Este mapeamento permite que webhooks Kirvano reutilizem os fluxos de mensagens existentes
+ * criados para eventos Cakto. As seguintes escolhas de mapeamento foram feitas:
+ * 
+ * - bank_slip_generated → boleto_gerado: Mapeamento direto (mesmo conceito)
+ * - pix_generated → pix_gerado: Mapeamento direto (mesmo conceito)
+ * - credit_card_generated → purchase_approved: Geralmente cartão de crédito significa aprovação imediata
+ * - sale_approved → purchase_approved: Mapeamento direto (mesmo conceito)
+ * - sale_refunded → purchase_refused: Mapeamento aproximado. Embora reembolso não seja o mesmo que
+ *   recusa, ambos resultam em uma venda não completada. Fluxos específicos para reembolso podem
+ *   ser criados futuramente se necessário.
+ * - sale_cancelled → purchase_refused: Cancelamento é tratado como recusa
+ * - checkout_abandoned → checkout_abandonment: Mapeamento direto (mesmo conceito)
  */
 export const KIRVANO_TO_CAKTO_EVENT_MAP: Record<KirvanoEventType, CaktoEventType> = {
   bank_slip_generated: "boleto_gerado",
   pix_generated: "pix_gerado",
-  credit_card_generated: "purchase_approved", // Cartão geralmente é aprovação
+  credit_card_generated: "purchase_approved",
   sale_approved: "purchase_approved",
-  sale_refunded: "purchase_refused", // Mapeamento aproximado
+  sale_refunded: "purchase_refused",
   sale_cancelled: "purchase_refused",
   checkout_abandoned: "checkout_abandonment",
 }

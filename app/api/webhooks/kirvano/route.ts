@@ -62,7 +62,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     try {
       const raw = JSON.parse(rawBody)
 
-      // If payload follows Kirvano's documented structure with a top-level `data`, map it to our internal shape
+      // Kirvano webhooks may arrive in different formats:
+      // 1. Directly as KirvanoWebhookPayload (simple format)
+      // 2. Nested under a 'data' key (Kirvano's documented API format)
+      // This transformation normalizes both formats into our internal KirvanoWebhookPayload structure.
+      // The mapping extracts customer, product, and payment information from various possible field names
+      // to ensure compatibility with different Kirvano API versions.
       if (raw && typeof raw === "object" && raw.data) {
         const d = raw.data
         const getAmount = (): number | undefined => {
