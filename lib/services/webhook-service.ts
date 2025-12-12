@@ -187,6 +187,11 @@ export class WebhookService {
       // Mapeia evento Kirvano para evento Cakto equivalente para reutilizar fluxos
       const mappedEventType = KIRVANO_TO_CAKTO_EVENT_MAP[payload.event]
       
+      // Validação de segurança: garante que o evento está mapeado
+      if (!mappedEventType) {
+        throw new Error(`Unsupported Kirvano event type: ${payload.event}`)
+      }
+      
       // Cria payload compatível com Cakto para reutilizar a lógica existente
       const mappedPayload: CaktoWebhookPayload = {
         event: mappedEventType,
