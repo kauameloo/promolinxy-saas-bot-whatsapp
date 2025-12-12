@@ -2,7 +2,7 @@
 # DOCKERFILE - Frontend Next.js
 # =====================================================
 
-FROM node:20 AS base
+FROM node:20-alpine AS base
 
 # Instala dependências apenas quando necessário
 FROM base AS deps
