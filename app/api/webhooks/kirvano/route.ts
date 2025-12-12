@@ -75,11 +75,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
           event: raw.event,
           order_id: d.orderId || d.order_id || d.id || undefined,
           transaction_id: d.transactionId || d.transaction_id || d.refId || undefined,
-          customer: d.customer
+          customer: d.customer && (d.customer.phone || d.customer.cellphone)
             ? {
                 name: d.customer.name || "",
                 email: d.customer.email || undefined,
-                phone: String(d.customer.phone || d.customer.cellphone || ""),
+                phone: String(d.customer.phone || d.customer.cellphone),
                 document: d.customer.document || d.customer.docNumber || undefined,
               }
             : undefined,

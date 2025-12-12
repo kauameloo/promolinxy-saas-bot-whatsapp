@@ -25,9 +25,9 @@ export class KirvanoWebhookService {
   }
 
   /**
-   * Mapeia evento Kirvano para evento interno (Cakto-like)
+   * Maps Kirvano event to internal event type
    */
-  private mapKirvanoEventToCakto(kirvanoEvent: string): CaktoEventType {
+  private mapKirvanoEventToInternal(kirvanoEvent: string): CaktoEventType {
     const eventMap: Record<string, CaktoEventType> = {
       "order.created": "checkout_abandonment",
       "order.approved": "purchase_approved",
@@ -41,15 +41,19 @@ export class KirvanoWebhookService {
       "cart.abandoned": "checkout_abandonment",
     }
 
-    return eventMap[kirvanoEvent] || "checkout_abandonment"
+    const mappedEvent = eventMap[kirvanoEvent]
+    if (!mappedEvent) {
+      console.warn(`⚠ Unknown Kirvano event '${kirvanoEvent}', defaulting to 'checkout_abandonment'`)
+    }
+    return mappedEvent || "checkout_abandonment"
   }
 
   /**
-   * Converte payload Kirvano para formato Cakto (normalização interna)
+   * Converts Kirvano payload to internal format (normalization)
    */
   private normalizeKirvanoPayload(payload: KirvanoWebhookPayload): any {
     return {
-      event: this.mapKirvanoEventToCakto(payload.event),
+      event: this.mapKirvanoEventToInternal(payload.event),
       transaction_id: payload.transaction_id || payload.order_id,
       customer: payload.customer,
       product: payload.product,
