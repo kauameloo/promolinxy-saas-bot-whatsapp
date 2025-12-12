@@ -126,6 +126,26 @@ private async simulateTyping(engine: WhatsAppEngine, chatId: string, text: strin
       // Verifica se existe sessão no Redis
       const existingSession = await this.redisSession.getSession(normalizedPhone)
 
+      // 🔥 Se a sessão terminou no Typebot → modo humano
+if (existingSession?.finished) {
+  this.log(`Sessão finalizada para ${normalizedPhone} → mensagens não vão mais para o Typebot.`)
+
+  // Aqui você pode futuramente enviar para um painel humano
+  await this.redisSession.saveSession(normalizedPhone, {
+    ...existingSession,
+    lastUsedAt: new Date().toISOString(),
+  })
+
+  return {
+    success: true,
+    messagesSent: 0,
+    errors: [],
+    isNewSession: false,
+    sessionId: existingSession.sessionId,
+  }
+}
+
+
       
       let typebotResponse: TypebotResponse
 
@@ -180,18 +200,54 @@ if (existingSession) {
 
         try {
           typebotResponse = await this.typebotClient.continueChat(existingSession.sessionId, resolvedMessage)
-        } catch (error) {
-          // Se a sessão expirou no Typebot, inicia nova
-          if (error instanceof Error && error.message === "SESSION_EXPIRED") {
-            this.log(`Sessão expirou no Typebot, iniciando nova...`)
-            await this.redisSession.deleteSession(normalizedPhone)
-            typebotResponse = await this.startNewSession(normalizedPhone, flowId)
-            result.isNewSession = true
-            result.sessionId = typebotResponse.sessionId
-          } else {
-            throw error
-          }
-        }
+} catch (error) {
+  // ❗ Detecta fim de fluxo baseado na destruição da sessão pelo Typebot
+  if (error instanceof Error && error.message === "SESSION_EXPIRED") {
+    const persisted = await this.redisSession.getSession(normalizedPhone);
+
+    // Se tínhamos uma sessão e ela morre sem finished=true, então o fluxo acabou
+    if (persisted && !persisted.finished) {
+      this.log(`[TypebotBridge] Sessão finalizada automaticamente pelo Typebot. Marcando como finished.`);
+
+      await this.redisSession.saveSession(normalizedPhone, {
+        ...persisted,
+        finished: true,
+        lastUsedAt: new Date().toISOString(),
+      });
+
+      return {
+        success: true,
+        messagesSent: 0,
+        errors: [],
+        isNewSession: false,
+        sessionId: persisted.sessionId,
+      };
+    }
+
+    // Se já estava finished, apenas ignora
+    if (persisted?.finished) {
+      this.log(`[TypebotBridge] Mensagem recebida após fluxo finalizado. Ignorando Typebot.`);
+      return {
+        success: true,
+        messagesSent: 0,
+        errors: [],
+        isNewSession: false,
+        sessionId: persisted.sessionId,
+      };
+    }
+
+    // Caso contrário, session expirou antes do fim → inicia nova
+    this.log(`Sessão expirou no Typebot antes do fim. Iniciando nova sessão...`);
+    await this.redisSession.deleteSession(normalizedPhone);
+
+    typebotResponse = await this.startNewSession(normalizedPhone, flowId);
+    result.isNewSession = true;
+    result.sessionId = typebotResponse.sessionId;
+  } else {
+    throw error;
+  }
+}
+
       } else {
         // Nova sessão - inicia chat
         this.log(`Iniciando nova sessão para ${normalizedPhone}`)
@@ -233,9 +289,27 @@ if (typebotResponse.sessionId) {
   }
 }
 
+if (typebotResponse.variables && typebotResponse.variables.finished === true) {
+  this.log(`Fluxo finalizado para ${normalizedPhone}. Marcando sessão como encerrada.`)
+
+  const current = await this.redisSession.getSession(normalizedPhone)
+
+  if (current && current.sessionId) {
+    await this.redisSession.saveSession(normalizedPhone, {
+      sessionId: current.sessionId,
+      flowId: current.flowId,
+      phoneNumber: current.phoneNumber,
+      lastUsedAt: new Date().toISOString(),
+      finished: true,   // ← AQUI! MARCA COMO FINALIZADO
+    })
+  }
+}
+
 
       // Parseia e envia as mensagens
       const parsedMessages = this.typebotClient.parseMessages(typebotResponse)
+
+
       this.log(`Mensagens a enviar: ${parsedMessages.length}`)
 
       for (const msg of parsedMessages) {

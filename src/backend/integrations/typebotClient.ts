@@ -66,6 +66,7 @@ export interface TypebotResponse {
     [key: string]: any
   }>
   logs?: string[]
+  variables?: Record<string, any>
 }
 
 /**

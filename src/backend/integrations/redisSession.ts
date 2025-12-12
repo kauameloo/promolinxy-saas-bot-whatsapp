@@ -13,6 +13,7 @@ export interface TypebotSessionData {
   lastUsedAt: string
   phoneNumber: string
   metadata?: Record<string, unknown>
+  finished?: boolean
 }
 
 /**
