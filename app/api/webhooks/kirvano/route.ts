@@ -11,39 +11,45 @@ import { z } from "zod"
 // Schema de validação do payload
 const KirvanoPayloadSchema = z.object({
   event: z.enum([
-    "order.created",
-    "order.approved",
-    "order.refused",
-    "order.refunded",
-    "order.cancelled",
-    "payment.pending",
-    "payment.approved",
-    "payment.refused",
-    "payment.refunded",
-    "cart.abandoned",
+    "ORDER_CREATED",
+    "ORDER_APPROVED",
+    "ORDER_REFUSED",
+    "ORDER_REFUNDED",
+    "ORDER_CANCELLED",
+    "PAYMENT_PENDING",
+    "PAYMENT_APPROVED",
+    "PAYMENT_REFUSED",
+    "PAYMENT_REFUNDED",
+    "CART_ABANDONED",
+    "PIX_GENERATED",
+    "BOLETO_GENERATED",
+    "CREDIT_CARD_GENERATED",
+    "PURCHASE_APPROVED",
+    "PURCHASE_REFUSED",
+    "CHECKOUT_ABANDONMENT",
   ]),
   order_id: z.string().optional(),
   transaction_id: z.string().optional(),
   customer: z
     .object({
-      name: z.string(),
+      name: z.string().optional(),
       email: z.string().email().optional(),
-      phone: z.string(),
+      phone: z.string().optional(),
       document: z.string().optional(),
     })
     .optional(),
   product: z
     .object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number(),
+      id: z.string().optional(),
+      name: z.string().optional(),
+      price: z.number().optional(),
     })
     .optional(),
   payment: z
     .object({
-      method: z.string(),
-      amount: z.number(),
-      status: z.string(),
+      method: z.string().optional(),
+      amount: z.number().optional(),
+      status: z.string().optional(),
       boleto_url: z.string().optional(),
       pix_code: z.string().optional(),
       pix_qrcode: z.string().optional(),
@@ -90,25 +96,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
                 price: d.product.price || d.amount || d.baseAmount || 0,
               }
             : undefined,
-          payment: d.payment
-            ? {
-                method: d.payment.method || d.paymentMethod || "",
-                amount: d.payment.amount || d.amount || d.baseAmount || 0,
-                status: d.payment.status || d.status || "",
-                boleto_url: d.payment.boletoUrl || d.boleto?.boletoUrl || undefined,
-                pix_code: d.payment.pixCode || d.pix?.qrCode || undefined,
-                pix_qrcode: d.payment.pixQrCode || d.pix?.qrCode || undefined,
-                checkout_url: d.payment.checkoutUrl || d.checkoutUrl || undefined,
-              }
-            : {
-                method: d.paymentMethod || "",
-                amount: d.amount || d.baseAmount || 0,
-                status: d.status || "",
-                boleto_url: d.boleto?.boletoUrl || undefined,
-                pix_code: d.pix?.qrCode || undefined,
-                pix_qrcode: d.pix?.qrCode || undefined,
-                checkout_url: d.checkoutUrl || undefined,
-              },
+          payment:
+            d.payment || d.paymentMethod || d.amount || d.pix || d.boleto
+              ? {
+                  method: d.payment?.method || d.paymentMethod || "",
+                  amount: d.payment?.amount || d.amount || d.baseAmount || 0,
+                  status: d.payment?.status || d.status || "",
+                  boleto_url: d.payment?.boletoUrl || d.boleto?.boletoUrl || undefined,
+                  pix_code: d.payment?.pixCode || d.pix?.qrCode || undefined,
+                  pix_qrcode: d.payment?.pixQrCode || d.pix?.qrCode || undefined,
+                  checkout_url: d.payment?.checkoutUrl || d.checkoutUrl || undefined,
+                }
+              : undefined,
           metadata: {
             ...d.metadata,
             affiliate: d.affiliate,
@@ -126,6 +125,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
 
         payload = mapped
       } else {
+        // Handle flat structure or already normalized payload
         payload = raw as KirvanoWebhookPayload
       }
     } catch {
@@ -191,16 +191,22 @@ export async function GET(): Promise<NextResponse<ApiResponse>> {
     message: "Kirvano webhook endpoint is active",
     data: {
       supportedEvents: [
-        "order.created",
-        "order.approved",
-        "order.refused",
-        "order.refunded",
-        "order.cancelled",
-        "payment.pending",
-        "payment.approved",
-        "payment.refused",
-        "payment.refunded",
-        "cart.abandoned",
+        "PIX_GENERATED",
+        "BOLETO_GENERATED",
+        "CREDIT_CARD_GENERATED",
+        "ORDER_CREATED",
+        "ORDER_APPROVED",
+        "ORDER_REFUSED",
+        "ORDER_REFUNDED",
+        "ORDER_CANCELLED",
+        "PAYMENT_PENDING",
+        "PAYMENT_APPROVED",
+        "PAYMENT_REFUSED",
+        "PAYMENT_REFUNDED",
+        "CART_ABANDONED",
+        "CHECKOUT_ABANDONMENT",
+        "PURCHASE_APPROVED",
+        "PURCHASE_REFUSED",
       ],
     },
   })

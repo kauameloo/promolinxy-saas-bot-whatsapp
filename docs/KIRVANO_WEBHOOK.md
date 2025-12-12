@@ -19,17 +19,23 @@ This integration adds support for Kirvano platform webhooks alongside the existi
 
 ## Supported Events
 
-### Kirvano Events
-1. `order.created` - New order created
-2. `order.approved` - Order approved
-3. `order.refused` - Order refused
-4. `order.refunded` - Order refunded
-5. `order.cancelled` - Order cancelled
-6. `payment.pending` - Payment pending
-7. `payment.approved` - Payment approved
-8. `payment.refused` - Payment refused
-9. `payment.refunded` - Payment refunded
-10. `cart.abandoned` - Shopping cart abandoned
+### Kirvano Events (Uppercase Format)
+1. `PIX_GENERATED` - PIX payment method generated
+2. `BOLETO_GENERATED` - Boleto payment method generated
+3. `CREDIT_CARD_GENERATED` - Credit card payment initiated
+4. `ORDER_CREATED` - New order created
+5. `ORDER_APPROVED` - Order approved
+6. `ORDER_REFUSED` - Order refused
+7. `ORDER_REFUNDED` - Order refunded
+8. `ORDER_CANCELLED` - Order cancelled
+9. `PAYMENT_PENDING` - Payment pending
+10. `PAYMENT_APPROVED` - Payment approved
+11. `PAYMENT_REFUSED` - Payment refused
+12. `PAYMENT_REFUNDED` - Payment refunded
+13. `CART_ABANDONED` - Shopping cart abandoned
+14. `CHECKOUT_ABANDONMENT` - Checkout abandoned
+15. `PURCHASE_APPROVED` - Purchase approved
+16. `PURCHASE_REFUSED` - Purchase refused
 
 ## Event Mapping
 
@@ -37,16 +43,22 @@ Kirvano events are automatically mapped to internal event types:
 
 | Kirvano Event | Internal Event |
 |---------------|----------------|
-| `order.created` | `checkout_abandonment` |
-| `order.approved` | `purchase_approved` |
-| `order.refused` | `purchase_refused` |
-| `order.refunded` | `purchase_refused` |
-| `order.cancelled` | `purchase_refused` |
-| `payment.pending` | `pix_gerado` |
-| `payment.approved` | `purchase_approved` |
-| `payment.refused` | `purchase_refused` |
-| `payment.refunded` | `purchase_refused` |
-| `cart.abandoned` | `checkout_abandonment` |
+| `PIX_GENERATED` | `pix_gerado` |
+| `BOLETO_GENERATED` | `boleto_gerado` |
+| `CREDIT_CARD_GENERATED` | `checkout_abandonment` |
+| `ORDER_CREATED` | `checkout_abandonment` |
+| `ORDER_APPROVED` | `purchase_approved` |
+| `ORDER_REFUSED` | `purchase_refused` |
+| `ORDER_REFUNDED` | `purchase_refused` |
+| `ORDER_CANCELLED` | `purchase_refused` |
+| `PAYMENT_PENDING` | `pix_gerado` |
+| `PAYMENT_APPROVED` | `purchase_approved` |
+| `PAYMENT_REFUSED` | `purchase_refused` |
+| `PAYMENT_REFUNDED` | `purchase_refused` |
+| `CART_ABANDONED` | `checkout_abandonment` |
+| `CHECKOUT_ABANDONMENT` | `checkout_abandonment` |
+| `PURCHASE_APPROVED` | `purchase_approved` |
+| `PURCHASE_REFUSED` | `purchase_refused` |
 
 ## Configuration
 
@@ -67,7 +79,7 @@ KIRVANO_API_KEY=your_api_key_here
 ### Basic Payload
 ```json
 {
-  "event": "order.approved",
+  "event": "PIX_GENERATED",
   "order_id": "order-123",
   "transaction_id": "txn-456",
   "customer": {
@@ -102,7 +114,7 @@ The webhook also supports Kirvano's nested structure:
 
 ```json
 {
-  "event": "order.approved",
+  "event": "PIX_GENERATED",
   "data": {
     "orderId": "order-123",
     "customer": {
@@ -113,7 +125,7 @@ The webhook also supports Kirvano's nested structure:
       "name": "Product Name"
     },
     "amount": 99.90,
-    "paymentMethod": "credit_card"
+    "paymentMethod": "pix"
   }
 }
 ```
@@ -154,7 +166,7 @@ Expected response:
 curl -X POST http://localhost:3000/api/webhooks/kirvano \
   -H "Content-Type: application/json" \
   -d '{
-    "event": "order.approved",
+    "event": "PIX_GENERATED",
     "order_id": "test-123",
     "customer": {
       "name": "Test Customer",
@@ -167,7 +179,7 @@ Expected response:
 ```json
 {
   "success": true,
-  "message": "Event order.approved processed successfully",
+  "message": "Event PIX_GENERATED processed successfully",
   "data": {
     "eventId": "evt-uuid..."
   }
@@ -189,7 +201,7 @@ Message flows can be configured for Kirvano events just like Cakto events:
 
 1. Go to Dashboard → Flows
 2. Create a new flow
-3. Select a Kirvano event type (e.g., "order.approved")
+3. Select a Kirvano event type (e.g., "PIX_GENERATED" or "PURCHASE_APPROVED")
 4. Add messages with variables
 5. Activate the flow
 

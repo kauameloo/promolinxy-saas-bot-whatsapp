@@ -29,16 +29,23 @@ export class KirvanoWebhookService {
    */
   private mapKirvanoEventToInternal(kirvanoEvent: string): CaktoEventType {
     const eventMap: Record<string, CaktoEventType> = {
-      "order.created": "checkout_abandonment",
-      "order.approved": "purchase_approved",
-      "order.refused": "purchase_refused",
-      "order.refunded": "purchase_refused",
-      "order.cancelled": "purchase_refused",
-      "payment.pending": "pix_gerado",
-      "payment.approved": "purchase_approved",
-      "payment.refused": "purchase_refused",
-      "payment.refunded": "purchase_refused",
-      "cart.abandoned": "checkout_abandonment",
+      // Kirvano uppercase format
+      "PIX_GENERATED": "pix_gerado",
+      "BOLETO_GENERATED": "boleto_gerado",
+      "CREDIT_CARD_GENERATED": "checkout_abandonment",
+      "ORDER_CREATED": "checkout_abandonment",
+      "ORDER_APPROVED": "purchase_approved",
+      "ORDER_REFUSED": "purchase_refused",
+      "ORDER_REFUNDED": "purchase_refused",
+      "ORDER_CANCELLED": "purchase_refused",
+      "PAYMENT_PENDING": "pix_gerado",
+      "PAYMENT_APPROVED": "purchase_approved",
+      "PAYMENT_REFUSED": "purchase_refused",
+      "PAYMENT_REFUNDED": "purchase_refused",
+      "CART_ABANDONED": "checkout_abandonment",
+      "CHECKOUT_ABANDONMENT": "checkout_abandonment",
+      "PURCHASE_APPROVED": "purchase_approved",
+      "PURCHASE_REFUSED": "purchase_refused",
     }
 
     const mappedEvent = eventMap[kirvanoEvent]

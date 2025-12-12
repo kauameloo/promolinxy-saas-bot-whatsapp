@@ -12,18 +12,24 @@ export type CaktoEventType =
   | "purchase_approved"
   | "purchase_refused"
 
-// Eventos Kirvano suportados
+// Eventos Kirvano suportados (formato real da plataforma)
 export type KirvanoEventType =
-  | "order.created"
-  | "order.approved"
-  | "order.refused"
-  | "order.refunded"
-  | "order.cancelled"
-  | "payment.pending"
-  | "payment.approved"
-  | "payment.refused"
-  | "payment.refunded"
-  | "cart.abandoned"
+  | "ORDER_CREATED"
+  | "ORDER_APPROVED"
+  | "ORDER_REFUSED"
+  | "ORDER_REFUNDED"
+  | "ORDER_CANCELLED"
+  | "PAYMENT_PENDING"
+  | "PAYMENT_APPROVED"
+  | "PAYMENT_REFUSED"
+  | "PAYMENT_REFUNDED"
+  | "CART_ABANDONED"
+  | "PIX_GENERATED"
+  | "BOLETO_GENERATED"
+  | "CREDIT_CARD_GENERATED"
+  | "PURCHASE_APPROVED"
+  | "PURCHASE_REFUSED"
+  | "CHECKOUT_ABANDONMENT"
 
 // Status de mensagem
 export type MessageStatus = "pending" | "scheduled" | "sending" | "sent" | "delivered" | "read" | "failed"
