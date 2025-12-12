@@ -12,6 +12,19 @@ export type CaktoEventType =
   | "purchase_approved"
   | "purchase_refused"
 
+// Eventos Kirvano suportados
+export type KirvanoEventType =
+  | "order.created"
+  | "order.approved"
+  | "order.refused"
+  | "order.refunded"
+  | "order.cancelled"
+  | "payment.pending"
+  | "payment.approved"
+  | "payment.refused"
+  | "payment.refunded"
+  | "cart.abandoned"
+
 // Status de mensagem
 export type MessageStatus = "pending" | "scheduled" | "sending" | "sent" | "delivered" | "read" | "failed"
 
@@ -42,6 +55,8 @@ export interface Tenant {
 export interface TenantSettings {
   webhook_secret?: string
   cakto_api_key?: string
+  kirvano_webhook_secret?: string
+  kirvano_api_key?: string
   timezone?: string
   daily_message_limit?: number
   working_hours?: {
@@ -82,7 +97,7 @@ export interface MessageTemplate {
   id: string
   tenant_id: string
   name: string
-  event_type: CaktoEventType
+  event_type: CaktoEventType | KirvanoEventType
   message_order: number
   content: string
   delay_minutes: number
@@ -96,7 +111,7 @@ export interface MessageFlow {
   id: string
   tenant_id: string
   name: string
-  event_type: CaktoEventType
+  event_type: CaktoEventType | KirvanoEventType
   description?: string
   is_active: boolean
   settings: FlowSettings
@@ -161,9 +176,9 @@ export interface Order {
 export interface WebhookEvent {
   id: string
   tenant_id: string
-  event_type: CaktoEventType
+  event_type: CaktoEventType | KirvanoEventType
   source: string
-  payload: CaktoWebhookPayload
+  payload: CaktoWebhookPayload | KirvanoWebhookPayload | any
   processed: boolean
   processed_at?: Date
   error_message?: string
@@ -238,6 +253,38 @@ export interface ApiKey {
 
 export interface CaktoWebhookPayload {
   event: CaktoEventType
+  transaction_id?: string
+  customer?: {
+    name: string
+    email?: string
+    phone: string
+    document?: string
+  }
+  product?: {
+    id: string
+    name: string
+    price: number
+  }
+  payment?: {
+    method: string
+    amount: number
+    status: string
+    boleto_url?: string
+    pix_code?: string
+    pix_qrcode?: string
+    checkout_url?: string
+  }
+  metadata?: Record<string, unknown>
+  timestamp?: string
+}
+
+// =====================================================
+// PAYLOADS DA KIRVANO
+// =====================================================
+
+export interface KirvanoWebhookPayload {
+  event: KirvanoEventType
+  order_id?: string
   transaction_id?: string
   customer?: {
     name: string
