@@ -1,0 +1,215 @@
+// =====================================================
+// WEBHOOK KIRVANO - Endpoint para receber eventos
+// =====================================================
+
+import { type NextRequest, NextResponse } from "next/server"
+import { WebhookService } from "@/lib/services/webhook-service"
+import { verifyWebhookSignature } from "@/lib/utils/crypto"
+import type { KirvanoWebhookPayload, ApiResponse } from "@/lib/types"
+import { z } from "zod"
+
+// Schema de validação do payload
+const KirvanoPayloadSchema = z.object({
+  event: z.enum([
+    "bank_slip_generated",
+    "pix_generated",
+    "credit_card_generated",
+    "sale_approved",
+    "sale_refunded",
+    "sale_cancelled",
+    "checkout_abandoned",
+  ]),
+  transaction_id: z.string().optional(),
+  customer: z
+    .object({
+      name: z.string(),
+      email: z.string().email().optional(),
+      phone: z.string(),
+      document: z.string().optional(),
+    })
+    .optional(),
+  product: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      price: z.number(),
+    })
+    .optional(),
+  payment: z
+    .object({
+      method: z.string(),
+      amount: z.number(),
+      status: z.string(),
+      boleto_url: z.string().optional(),
+      pix_code: z.string().optional(),
+      pix_qrcode: z.string().optional(),
+      checkout_url: z.string().optional(),
+    })
+    .optional(),
+  metadata: z.record(z.unknown()).optional(),
+  timestamp: z.string().optional(),
+})
+
+// Tenant padrão (em produção, viria de header ou API key)
+import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
+
+export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    // Lê o body como texto para verificação de assinatura
+    const rawBody = await request.text()
+    let payload: KirvanoWebhookPayload
+
+    try {
+      const raw = JSON.parse(rawBody)
+
+      // If payload follows Kirvano's documented structure with a top-level `data`, map it to our internal shape
+      if (raw && typeof raw === "object" && raw.data) {
+        const d = raw.data
+        const getAmount = (): number | undefined => {
+          // Prefer explicit amount, else baseAmount/product.offer price
+          if (typeof d.amount === "number") return d.amount
+          if (typeof d.baseAmount === "number") return d.baseAmount
+          if (d.offer && typeof d.offer.price === "number") return d.offer.price
+          return undefined
+        }
+
+        const paymentMethod = d.paymentMethod || d.paymentMethodName || undefined
+        const status = d.status || undefined
+
+        const pix = d.pix || undefined
+        const boleto = d.boleto || undefined
+
+        const productName = d.product?.name || d.offer?.name
+        const productId = d.product?.id || d.product?.short_id || d.offer?.id
+
+        const customerPhone = d.customer?.phone || d.customerCellphone
+        const customerName = d.customer?.name || d.customerName
+        const customerEmail = d.customer?.email || d.customerEmail
+        const customerDoc = d.customer?.docNumber || d.customer?.document || undefined
+
+        const mapped: KirvanoWebhookPayload = {
+          event: raw.event,
+          transaction_id: d.id || d.refId || undefined,
+          customer: customerPhone
+            ? {
+                name: customerName || "",
+                email: customerEmail || undefined,
+                phone: String(customerPhone),
+                document: customerDoc || undefined,
+              }
+            : undefined,
+          product: productName || productId
+            ? {
+                id: String(productId || ""),
+                name: String(productName || "Produto"),
+                price: getAmount() ?? 0,
+              }
+            : undefined,
+          payment: {
+            method: paymentMethod || "",
+            amount: getAmount() ?? 0,
+            status: status || "",
+            boleto_url: boleto?.boletoUrl || undefined,
+            pix_code: pix?.qrCode || undefined,
+            pix_qrcode: pix?.qrCode || undefined,
+            checkout_url: d.checkoutUrl || undefined,
+          },
+          metadata: {
+            affiliate: d.affiliate,
+            fees: d.fees,
+            discount: d.discount,
+            installments: d.installments,
+            utm_source: d.utm_source,
+            utm_medium: d.utm_medium,
+            utm_campaign: d.utm_campaign,
+            utm_term: d.utm_term,
+            utm_content: d.utm_content,
+            paidAt: d.paidAt,
+            createdAt: d.createdAt,
+            refundedAt: d.refundedAt,
+            chargedbackAt: d.chargedbackAt,
+            subscription: d.subscription,
+            next_payment_date: d.subscription?.next_payment_date,
+            paymentMethodName: d.paymentMethodName,
+          },
+          timestamp: new Date().toISOString(),
+        }
+
+        payload = mapped
+      } else {
+        payload = raw as KirvanoWebhookPayload
+      }
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 })
+    }
+
+    // Verifica assinatura (se configurada)
+    const signature = request.headers.get("x-kirvano-signature") || request.headers.get("x-webhook-signature")
+    const webhookSecret = process.env.KIRVANO_WEBHOOK_SECRET
+
+    if (webhookSecret && signature) {
+      const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret)
+      if (!isValid) {
+        console.error("Invalid webhook signature")
+        return NextResponse.json({ success: false, error: "Invalid signature" }, { status: 401 })
+      }
+    }
+
+    // Valida payload com Zod
+    const validationResult = KirvanoPayloadSchema.safeParse(payload)
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.errors)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid payload structure",
+          message: validationResult.error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 },
+      )
+    }
+
+    // Extrai tenant ID (do header ou usa padrão)
+    const tenantId = request.headers.get("x-tenant-id") || DEFAULT_TENANT_ID
+
+    // Processa o webhook
+    const webhookService = new WebhookService(tenantId)
+    const event = await webhookService.processKirvanoWebhook(validationResult.data)
+
+    console.log(`Webhook processed: ${event.event_type} - ${event.id}`)
+
+    return NextResponse.json({
+      success: true,
+      data: { eventId: event.id },
+      message: `Event ${event.event_type} processed successfully`,
+    })
+  } catch (error) {
+    console.error("Webhook processing error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+// Health check
+export async function GET(): Promise<NextResponse<ApiResponse>> {
+  return NextResponse.json({
+    success: true,
+    message: "Kirvano webhook endpoint is active",
+    data: {
+      supportedEvents: [
+        "bank_slip_generated",
+        "pix_generated",
+        "credit_card_generated",
+        "sale_approved",
+        "sale_refunded",
+        "sale_cancelled",
+        "checkout_abandoned",
+      ],
+    },
+  })
+}

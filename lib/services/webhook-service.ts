@@ -1,13 +1,14 @@
 // =====================================================
-// WEBHOOK SERVICE - Processamento de webhooks Cakto
+// WEBHOOK SERVICE - Processamento de webhooks Cakto e Kirvano
 // =====================================================
 
 import { insert, query, update } from "@/lib/db"
-import type { WebhookEvent, CaktoWebhookPayload } from "@/lib/types"
+import type { WebhookEvent, CaktoWebhookPayload, KirvanoWebhookPayload, CaktoEventType } from "@/lib/types"
 import { CustomerService } from "./customer-service"
 import { OrderService } from "./order-service"
 import { FlowService } from "./flow-service"
 import { MessageService } from "./message-service"
+import { KIRVANO_TO_CAKTO_EVENT_MAP } from "@/lib/constants/default-flows"
 
 export class WebhookService {
   private tenantId: string
@@ -148,6 +149,81 @@ export class WebhookService {
       }
     } else {
       console.warn("⚠ No customer available - skipping message scheduling")
+    }
+  }
+
+  /**
+   * Processa webhook da Kirvano
+   */
+  async processKirvanoWebhook(payload: KirvanoWebhookPayload): Promise<WebhookEvent> {
+    const isDebugMode = process.env.NODE_ENV === "development" || process.env.WEBHOOK_DEBUG_LOG === "true"
+    
+    // Log detalhado do payload recebido para debugging (apenas em development)
+    if (isDebugMode) {
+      console.log("=== KIRVANO WEBHOOK RECEIVED ===")
+      console.log("Event Type:", payload.event)
+      console.log("Transaction ID:", payload.transaction_id || "N/A")
+      console.log("Customer Data:", JSON.stringify(payload.customer, null, 2))
+      console.log("Product Data:", JSON.stringify(payload.product, null, 2))
+      console.log("Payment Data:", JSON.stringify(payload.payment, null, 2))
+      console.log("Metadata:", JSON.stringify(payload.metadata, null, 2))
+      console.log("==============================")
+    } else {
+      // Em produção, log apenas informações essenciais (sem dados sensíveis)
+      console.log(`Kirvano webhook received: ${payload.event} - Transaction: ${payload.transaction_id || "N/A"}`)
+    }
+
+    // Registra o evento
+    const event = await insert<WebhookEvent>("webhook_events", {
+      tenant_id: this.tenantId,
+      event_type: payload.event,
+      source: "kirvano",
+      payload: JSON.stringify(payload),
+      processed: false,
+      retry_count: 0,
+    })
+
+    try {
+      // Mapeia evento Kirvano para evento Cakto equivalente para reutilizar fluxos
+      const mappedEventType = KIRVANO_TO_CAKTO_EVENT_MAP[payload.event]
+      
+      // Cria payload compatível com Cakto para reutilizar a lógica existente
+      const mappedPayload: CaktoWebhookPayload = {
+        event: mappedEventType,
+        transaction_id: payload.transaction_id,
+        customer: payload.customer,
+        product: payload.product,
+        payment: payload.payment,
+        metadata: {
+          ...payload.metadata,
+          original_source: "kirvano",
+          original_event: payload.event,
+        },
+        timestamp: payload.timestamp,
+      }
+
+      // Processa usando a lógica existente
+      await this.handleEvent(mappedPayload, isDebugMode)
+
+      // Marca como processado
+      await update("webhook_events", event.id, {
+        processed: true,
+        processed_at: new Date().toISOString(),
+      })
+
+      if (isDebugMode) {
+        console.log(`✓ Kirvano webhook ${event.id} processed successfully`)
+      }
+      return { ...event, processed: true }
+    } catch (error) {
+      // Registra erro
+      console.error(`✗ Kirvano webhook ${event.id} processing failed:`, error)
+      await update("webhook_events", event.id, {
+        error_message: error instanceof Error ? error.message : "Unknown error",
+        retry_count: event.retry_count + 1,
+      })
+
+      throw error
     }
   }
 

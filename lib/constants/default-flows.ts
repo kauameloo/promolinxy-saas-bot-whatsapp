@@ -2,7 +2,7 @@
 // DEFAULT FLOWS - Fluxos de mensagens padrão
 // =====================================================
 
-import type { CaktoEventType } from "@/lib/types"
+import type { CaktoEventType, KirvanoEventType } from "@/lib/types"
 
 interface DefaultFlowMessage {
   content: string
@@ -326,4 +326,60 @@ export const EVENT_COLORS: Record<CaktoEventType, string> = {
   checkout_abandonment: "bg-red-500",
   purchase_approved: "bg-emerald-500",
   purchase_refused: "bg-rose-500",
+}
+
+// =====================================================
+// KIRVANO CONSTANTS
+// =====================================================
+
+/**
+ * Lista todos os tipos de eventos Kirvano suportados
+ */
+export const KIRVANO_SUPPORTED_EVENTS: KirvanoEventType[] = [
+  "bank_slip_generated",
+  "pix_generated",
+  "credit_card_generated",
+  "sale_approved",
+  "sale_refunded",
+  "sale_cancelled",
+  "checkout_abandoned",
+]
+
+/**
+ * Labels amigáveis para os eventos Kirvano
+ */
+export const KIRVANO_EVENT_LABELS: Record<KirvanoEventType, string> = {
+  bank_slip_generated: "Boleto Gerado",
+  pix_generated: "PIX Gerado",
+  credit_card_generated: "Cartão de Crédito Gerado",
+  sale_approved: "Venda Aprovada",
+  sale_refunded: "Venda Reembolsada",
+  sale_cancelled: "Venda Cancelada",
+  checkout_abandoned: "Checkout Abandonado",
+}
+
+/**
+ * Cores para os eventos Kirvano (para UI)
+ */
+export const KIRVANO_EVENT_COLORS: Record<KirvanoEventType, string> = {
+  bank_slip_generated: "bg-amber-500",
+  pix_generated: "bg-green-500",
+  credit_card_generated: "bg-blue-500",
+  sale_approved: "bg-emerald-500",
+  sale_refunded: "bg-orange-500",
+  sale_cancelled: "bg-rose-500",
+  checkout_abandoned: "bg-red-500",
+}
+
+/**
+ * Mapeamento de eventos Kirvano para eventos Cakto (para reutilizar fluxos)
+ */
+export const KIRVANO_TO_CAKTO_EVENT_MAP: Record<KirvanoEventType, CaktoEventType> = {
+  bank_slip_generated: "boleto_gerado",
+  pix_generated: "pix_gerado",
+  credit_card_generated: "purchase_approved", // Cartão geralmente é aprovação
+  sale_approved: "purchase_approved",
+  sale_refunded: "purchase_refused", // Mapeamento aproximado
+  sale_cancelled: "purchase_refused",
+  checkout_abandoned: "checkout_abandonment",
 }
