@@ -46,6 +46,11 @@ export class KirvanoWebhookService {
       "CHECKOUT_ABANDONMENT": "checkout_abandonment",
       "PURCHASE_APPROVED": "purchase_approved",
       "PURCHASE_REFUSED": "purchase_refused",
+      "SALE_APPROVED": "purchase_approved",
+      "SALE_REFUSED": "purchase_refused",
+      "SALE_REFUNDED": "purchase_refused",
+      "SUBSCRIPTION_CREATED": "checkout_abandonment",
+      "SUBSCRIPTION_CANCELLED": "purchase_refused",
     }
 
     const mappedEvent = eventMap[kirvanoEvent]
@@ -98,10 +103,11 @@ export class KirvanoWebhookService {
       )
     }
 
-    // Registra o evento
+    // Registra o evento com tipo mapeado para compatibilidade interna
+    const mappedEventType = this.mapKirvanoEventToInternal(payload.event)
     const event = await insert<WebhookEvent>("webhook_events", {
       tenant_id: this.tenantId,
-      event_type: payload.event,
+      event_type: mappedEventType,
       source: "kirvano",
       payload: JSON.stringify(payload),
       processed: false,

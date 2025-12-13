@@ -30,6 +30,11 @@ export type KirvanoEventType =
   | "PURCHASE_APPROVED"
   | "PURCHASE_REFUSED"
   | "CHECKOUT_ABANDONMENT"
+  | "SALE_APPROVED"
+  | "SALE_REFUSED"
+  | "SALE_REFUNDED"
+  | "SUBSCRIPTION_CREATED"
+  | "SUBSCRIPTION_CANCELLED"
 
 // Status de mensagem
 export type MessageStatus = "pending" | "scheduled" | "sending" | "sent" | "delivered" | "read" | "failed"
