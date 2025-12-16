@@ -642,10 +642,18 @@ export class WhatsAppEngine {
         console.warn(`[WhatsApp ${this.sessionId}] Received message with missing properties`)
         return
       }
+      
+      // Skip LID messages - they will be processed by the Zender webhook with the correct classic number
+      // This prevents duplicate processing when messages arrive via both WhatsApp engine and Zender
+      const fromStr: string = String(message.from)
+      if (fromStr.includes("@lid")) {
+        console.log(`[WhatsApp ${this.sessionId}] Skipping LID message (will be handled by Zender webhook): ${fromStr}`)
+        return
+      }
+      
       // Cache LID to phone mapping to help avoid misrouting
       try {
         const msgAny = message as any
-        const fromStr: string = String(message.from)
         
         // Extract classic phone number
         const isClassic = fromStr.endsWith("@c.us") || fromStr.endsWith("@s.whatsapp.net")
@@ -1077,6 +1085,20 @@ async simulateTyping(to: string, text: string): Promise<void> {
       console.error(`[WhatsApp Engine] Error refreshing QR code:`, error)
       this.status = "error"
       return null
+    }
+  }
+
+  /**
+   * Store LID to phone number mapping
+   * This is used to prevent duplicate message processing when messages come via both
+   * the WhatsApp engine and external webhooks (like Zender)
+   */
+  storeLidMapping(lidDigits: string, classicDigits: string): void {
+    if (lidDigits && classicDigits && lidDigits !== classicDigits) {
+      if (lidDigits.length >= 10 && lidDigits.length <= 15 && classicDigits.length >= 8 && classicDigits.length <= 15) {
+        this.lidToPhoneMap.set(lidDigits, classicDigits)
+        console.log(`[WhatsApp Engine] Stored LID mapping: ${lidDigits} -> ${classicDigits}`)
+      }
     }
   }
 
