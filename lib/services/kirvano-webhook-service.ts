@@ -43,6 +43,7 @@ export class KirvanoWebhookService {
       "PAYMENT_REFUSED": "purchase_refused",
       "PAYMENT_REFUNDED": "purchase_refused",
       "CART_ABANDONED": "checkout_abandonment",
+      "ABANDONED_CART": "checkout_abandonment",
       "CHECKOUT_ABANDONMENT": "checkout_abandonment",
       "PURCHASE_APPROVED": "purchase_approved",
       "PURCHASE_REFUSED": "purchase_refused",
