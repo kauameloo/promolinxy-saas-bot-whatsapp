@@ -443,7 +443,7 @@ if (!engine) {
     // _data.key.remoteJidAlt com JID clássico (@s.whatsapp.net). Vamos preferir 
     // sempre os dígitos do JID clássico se disponíveis.
     // ------------------------------------------------------------
-    if (body?.event === "message" && body?.payload) {
+  if (body?.event === "message" && body?.payload) {
       // Extrai possíveis fontes
       const payload = body.payload;
       const key = payload?._data?.key || {};
@@ -455,13 +455,17 @@ if (!engine) {
 
       // Preferência: usar remoteJidAlt se for clássico (@s.whatsapp.net ou @c.us)
       let phoneDigits = "";
+      let selectedSource: "remoteJidAlt" | "remoteJid" | "from" = "from";
       if (remoteJidAlt && (remoteJidAlt.endsWith("@s.whatsapp.net") || remoteJidAlt.endsWith("@c.us"))) {
         phoneDigits = toDigits(remoteJidAlt);
+        selectedSource = "remoteJidAlt";
       } else if (remoteJid && (remoteJid.endsWith("@s.whatsapp.net") || remoteJid.endsWith("@c.us"))) {
         phoneDigits = toDigits(remoteJid);
+        selectedSource = "remoteJid";
       } else {
         // Fallback: usar from como dígitos (mesmo que seja @lid, apenas dígitos)
         phoneDigits = toDigits(payload.from || remoteJid || remoteJidAlt || "");
+        selectedSource = "from";
       }
 
       // Escolhe engine pelo session
@@ -506,26 +510,20 @@ if (!engine) {
       }
 
       // Conteúdo da mensagem
-      const text = payload?.body || payload?.message?.extendedTextMessage?.text || "";
+      const text =
+        payload?.body ||
+        payload?.message?.extendedTextMessage?.text ||
+        payload?.message?.conversation ||
+        "";
       if (!phoneDigits || !text) {
         console.warn("[Zender Webhook] message: Dados incompletos:", { phoneDigits, text });
         return res.status(200).json({ success: true, processed: false, reason: "Missing phone or text" });
       }
 
-      // Store LID mapping if we have both LID and classic JID
-      // This prevents duplicate message processing
-      if (remoteJid.includes("@lid") && remoteJidAlt && phoneDigits) {
-        const lidDigits = toDigits(remoteJid);
-        if (lidDigits && lidDigits !== phoneDigits && lidDigits.length >= 10) {
-          // Store the mapping in the engine to prevent duplicate processing
-          if (engine && typeof (engine as any).storeLidMapping === 'function') {
-            (engine as any).storeLidMapping(lidDigits, phoneDigits);
-            console.log(`[Zender Webhook] Stored LID mapping: ${lidDigits} -> ${phoneDigits}`);
-          }
-        }
-      }
-
-      console.log(`[Zender Webhook] message: usando dígitos clássicos '${phoneDigits}' (session=${tenantId})`);
+      console.log(
+        `[Zender Webhook] message: usando dígitos clássicos '${phoneDigits}' (session=${tenantId}) via ${selectedSource}. ` +
+          `Campos: from='${String(payload.from || "").slice(0, 40)}', remoteJid='${String(remoteJid).slice(0, 40)}', remoteJidAlt='${String(remoteJidAlt).slice(0, 40)}'`
+      );
 
       try {
         const result = await typebotBridge.processIncomingMessage(engine, phoneDigits, text);

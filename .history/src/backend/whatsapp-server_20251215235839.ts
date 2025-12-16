@@ -471,38 +471,10 @@ if (!engine) {
         return res.status(400).json({ success: false, error: "Missing session/tenantId" });
       }
 
-      let engine = whatsappManager.getEngine(tenantId);
+      const engine = whatsappManager.getEngine(tenantId);
       if (!engine) {
         console.warn("[Zender Webhook] message: Nenhum engine encontrado para tenant:", tenantId);
-        // Tentativa 1: localizar engine pelo número do próprio bot (body.me.id)
-        try {
-          const meId: string = body?.me?.id || "";
-          const meDigits = meId.replace(/@.*$/, "").replace(/\D/g, "");
-          const engines = whatsappManager.getAllEngines();
-          for (const [, eng] of engines) {
-            const status = eng.getStatus();
-            const botDigits = (status.phoneNumber || "").replace(/\D/g, "");
-            if (botDigits && meDigits && botDigits.endsWith(meDigits)) {
-              engine = eng;
-              console.log(`[Zender Webhook] message: engine resolvido via me.id (${meDigits})`);
-              break;
-            }
-          }
-        } catch {}
-
-        // Tentativa 2: pegar o primeiro engine conectado
-        if (!engine) {
-          const engines = whatsappManager.getAllEngines();
-          const connected = engines.find(([, eng]) => eng.isConnected());
-          if (connected) {
-            engine = connected[1];
-            console.log(`[Zender Webhook] message: usando engine conectado por fallback`);
-          }
-        }
-
-        if (!engine) {
-          return res.status(400).json({ success: false, error: `Engine not found for tenant ${tenantId}` });
-        }
+        return res.status(400).json({ success: false, error: `Engine not found for tenant ${tenantId}` });
       }
 
       // Conteúdo da mensagem
@@ -510,19 +482,6 @@ if (!engine) {
       if (!phoneDigits || !text) {
         console.warn("[Zender Webhook] message: Dados incompletos:", { phoneDigits, text });
         return res.status(200).json({ success: true, processed: false, reason: "Missing phone or text" });
-      }
-
-      // Store LID mapping if we have both LID and classic JID
-      // This prevents duplicate message processing
-      if (remoteJid.includes("@lid") && remoteJidAlt && phoneDigits) {
-        const lidDigits = toDigits(remoteJid);
-        if (lidDigits && lidDigits !== phoneDigits && lidDigits.length >= 10) {
-          // Store the mapping in the engine to prevent duplicate processing
-          if (engine && typeof (engine as any).storeLidMapping === 'function') {
-            (engine as any).storeLidMapping(lidDigits, phoneDigits);
-            console.log(`[Zender Webhook] Stored LID mapping: ${lidDigits} -> ${phoneDigits}`);
-          }
-        }
       }
 
       console.log(`[Zender Webhook] message: usando dígitos clássicos '${phoneDigits}' (session=${tenantId})`);

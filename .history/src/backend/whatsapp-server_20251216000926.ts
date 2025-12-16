@@ -512,19 +512,6 @@ if (!engine) {
         return res.status(200).json({ success: true, processed: false, reason: "Missing phone or text" });
       }
 
-      // Store LID mapping if we have both LID and classic JID
-      // This prevents duplicate message processing
-      if (remoteJid.includes("@lid") && remoteJidAlt && phoneDigits) {
-        const lidDigits = toDigits(remoteJid);
-        if (lidDigits && lidDigits !== phoneDigits && lidDigits.length >= 10) {
-          // Store the mapping in the engine to prevent duplicate processing
-          if (engine && typeof (engine as any).storeLidMapping === 'function') {
-            (engine as any).storeLidMapping(lidDigits, phoneDigits);
-            console.log(`[Zender Webhook] Stored LID mapping: ${lidDigits} -> ${phoneDigits}`);
-          }
-        }
-      }
-
       console.log(`[Zender Webhook] message: usando dígitos clássicos '${phoneDigits}' (session=${tenantId})`);
 
       try {

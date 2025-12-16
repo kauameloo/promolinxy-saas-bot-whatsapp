@@ -33,9 +33,15 @@ This integration adds support for Kirvano platform webhooks alongside the existi
 11. `PAYMENT_REFUSED` - Payment refused
 12. `PAYMENT_REFUNDED` - Payment refunded
 13. `CART_ABANDONED` - Shopping cart abandoned
-14. `CHECKOUT_ABANDONMENT` - Checkout abandoned
-15. `PURCHASE_APPROVED` - Purchase approved
-16. `PURCHASE_REFUSED` - Purchase refused
+14. `ABANDONED_CART` - Shopping cart abandoned (alternative format)
+15. `CHECKOUT_ABANDONMENT` - Checkout abandoned
+16. `PURCHASE_APPROVED` - Purchase approved
+17. `PURCHASE_REFUSED` - Purchase refused
+18. `SALE_APPROVED` - Sale approved
+19. `SALE_REFUSED` - Sale refused
+20. `SALE_REFUNDED` - Sale refunded
+21. `SUBSCRIPTION_CREATED` - Subscription created
+22. `SUBSCRIPTION_CANCELLED` - Subscription cancelled
 
 ## Event Mapping
 
@@ -56,9 +62,15 @@ Kirvano events are automatically mapped to internal event types:
 | `PAYMENT_REFUSED` | `purchase_refused` |
 | `PAYMENT_REFUNDED` | `purchase_refused` |
 | `CART_ABANDONED` | `checkout_abandonment` |
+| `ABANDONED_CART` | `checkout_abandonment` |
 | `CHECKOUT_ABANDONMENT` | `checkout_abandonment` |
 | `PURCHASE_APPROVED` | `purchase_approved` |
 | `PURCHASE_REFUSED` | `purchase_refused` |
+| `SALE_APPROVED` | `purchase_approved` |
+| `SALE_REFUSED` | `purchase_refused` |
+| `SALE_REFUNDED` | `purchase_refused` |
+| `SUBSCRIPTION_CREATED` | `checkout_abandonment` |
+| `SUBSCRIPTION_CANCELLED` | `purchase_refused` |
 
 ## Configuration
 

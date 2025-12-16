@@ -296,8 +296,6 @@ export class WhatsAppEngine {
   private isInitializing = false
   /** Cached client config built from env and defaults */
   private clientConfig: any | null = null
-  /** Map of LID numbers to their corresponding classic phone numbers to avoid misrouting */
-  private lidToPhoneMap: Map<string, string> = new Map()
 
   /**
    * Build whatsapp-web.js Client configuration with robust Puppeteer flags for Docker/Chromium
@@ -642,45 +640,6 @@ export class WhatsAppEngine {
         console.warn(`[WhatsApp ${this.sessionId}] Received message with missing properties`)
         return
       }
-      
-      // Skip LID messages - they will be processed by the Zender webhook with the correct classic number
-      // This prevents duplicate processing when messages arrive via both WhatsApp engine and Zender
-      const fromStr: string = String(message.from)
-      if (fromStr.includes("@lid")) {
-        console.log(`[WhatsApp ${this.sessionId}] Skipping LID message (will be handled by Zender webhook): ${fromStr}`)
-        return
-      }
-      
-      // Cache LID to phone mapping to help avoid misrouting
-      try {
-        const msgAny = message as any
-        
-        // Extract classic phone number
-        const isClassic = fromStr.endsWith("@c.us") || fromStr.endsWith("@s.whatsapp.net")
-        if (isClassic) {
-          const classicDigits = fromStr.replace(/\D/g, "")
-          
-          // Validate classic digits (phone numbers are typically 8-15 digits)
-          if (classicDigits.length >= 8 && classicDigits.length <= 15) {
-            // Check if there's an alternate LID identifier
-            // WhatsApp Web.js may expose id.user and id.server separately
-            if (msgAny.id && msgAny.id.remote) {
-              const remote = String(msgAny.id.remote)
-              // If remote contains LID (@lid), map it to classic number
-              if (remote.includes("@lid")) {
-                const lidDigits = remote.replace(/\D/g, "")
-                // Validate LID digits and ensure it's different from classic
-                if (lidDigits.length >= 10 && lidDigits.length <= 15 && lidDigits !== classicDigits) {
-                  this.lidToPhoneMap.set(lidDigits, classicDigits)
-                  console.log(`[WhatsApp Engine] Mapped LID ${lidDigits} -> ${classicDigits}`)
-                }
-              }
-            }
-          }
-        }
-      } catch {
-        // ignore cache errors
-      }
       this.handlers.onMessage?.({
         from: message.from,
         body: message.body,
@@ -720,31 +679,7 @@ export class WhatsAppEngine {
     try {
       const preferCUS = process.env.WHATSAPP_PREFER_CUS !== "false"
       if (preferCUS) {
-        let digits = String(phoneNumber).replace(/\D/g, "")
-
-        // Heuristic fix: if the target looks like an LID-derived number (commonly starting with 84...)
-        // check our LID to phone mapping to get the correct classic number.
-        // Example: inbound remoteJid was 5511942774485@s.whatsapp.net but remoteJidAlt (LID) was 84027394506995@lid.
-        // If the caller passed 84027394506995, we swap to the mapped classic digits 5511942774485.
-        // 
-        // Note: LID pattern (^84\d{10,13}$) is a heuristic based on observed WhatsApp behavior.
-        // This pattern can be configured via WHATSAPP_LID_PATTERN env variable if needed.
-        const lidPattern = process.env.WHATSAPP_LID_PATTERN || "^84\\d{10,13}$"
-        const looksLikeLidDerived = new RegExp(lidPattern).test(digits)
-        if (looksLikeLidDerived) {
-          const mappedPhone = this.lidToPhoneMap.get(digits)
-          if (mappedPhone) {
-            console.log(
-              `[WhatsApp Engine] Correcting LID-derived target ${digits} -> ${mappedPhone} using LID map`
-            )
-            digits = mappedPhone
-          } else {
-            console.warn(
-              `[WhatsApp Engine] LID-derived number ${digits} found but no mapping exists. Message may be misrouted.`
-            )
-          }
-        }
-
+        const digits = String(phoneNumber).replace(/\D/g, "")
         const chatId = `${digits}@c.us`
         // For new numbers (no prior chat), WhatsApp will still accept direct send to c.us
         // Return immediately to avoid any LID discovery/misrouting.
@@ -1085,20 +1020,6 @@ async simulateTyping(to: string, text: string): Promise<void> {
       console.error(`[WhatsApp Engine] Error refreshing QR code:`, error)
       this.status = "error"
       return null
-    }
-  }
-
-  /**
-   * Store LID to phone number mapping
-   * This is used to prevent duplicate message processing when messages come via both
-   * the WhatsApp engine and external webhooks (like Zender)
-   */
-  storeLidMapping(lidDigits: string, classicDigits: string): void {
-    if (lidDigits && classicDigits && lidDigits !== classicDigits) {
-      if (lidDigits.length >= 10 && lidDigits.length <= 15 && classicDigits.length >= 8 && classicDigits.length <= 15) {
-        this.lidToPhoneMap.set(lidDigits, classicDigits)
-        console.log(`[WhatsApp Engine] Stored LID mapping: ${lidDigits} -> ${classicDigits}`)
-      }
     }
   }
 

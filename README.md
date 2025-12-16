@@ -35,7 +35,7 @@ This project supports webhook integrations from multiple platforms:
 
 ### Supported Platforms
 - **Cakto** - `/api/webhooks/cakto` - Original payment platform integration
-- **Kirvano** - `/api/webhooks/kirvano` - New payment platform integration (10 event types)
+- **Kirvano** - `/api/webhooks/kirvano` - New payment platform integration (22 event types)
 
 Both integrations operate independently and support automated WhatsApp messaging flows based on payment events.
 
