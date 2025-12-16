@@ -652,16 +652,20 @@ export class WhatsAppEngine {
         if (isClassic) {
           const classicDigits = fromStr.replace(/\D/g, "")
           
-          // Check if there's an alternate LID identifier
-          // WhatsApp Web.js may expose id.user and id.server separately
-          if (msgAny.id && msgAny.id.remote) {
-            const remote = String(msgAny.id.remote)
-            // If remote contains LID (@lid), map it to classic number
-            if (remote.includes("@lid")) {
-              const lidDigits = remote.replace(/\D/g, "")
-              if (lidDigits && classicDigits && lidDigits !== classicDigits) {
-                this.lidToPhoneMap.set(lidDigits, classicDigits)
-                console.log(`[WhatsApp Engine] Mapped LID ${lidDigits} -> ${classicDigits}`)
+          // Validate classic digits (phone numbers are typically 8-15 digits)
+          if (classicDigits.length >= 8 && classicDigits.length <= 15) {
+            // Check if there's an alternate LID identifier
+            // WhatsApp Web.js may expose id.user and id.server separately
+            if (msgAny.id && msgAny.id.remote) {
+              const remote = String(msgAny.id.remote)
+              // If remote contains LID (@lid), map it to classic number
+              if (remote.includes("@lid")) {
+                const lidDigits = remote.replace(/\D/g, "")
+                // Validate LID digits and ensure it's different from classic
+                if (lidDigits.length >= 10 && lidDigits.length <= 15 && lidDigits !== classicDigits) {
+                  this.lidToPhoneMap.set(lidDigits, classicDigits)
+                  console.log(`[WhatsApp Engine] Mapped LID ${lidDigits} -> ${classicDigits}`)
+                }
               }
             }
           }
@@ -714,7 +718,11 @@ export class WhatsAppEngine {
         // check our LID to phone mapping to get the correct classic number.
         // Example: inbound remoteJid was 5511942774485@s.whatsapp.net but remoteJidAlt (LID) was 84027394506995@lid.
         // If the caller passed 84027394506995, we swap to the mapped classic digits 5511942774485.
-        const looksLikeLidDerived = /^84\d{10,13}$/.test(digits)
+        // 
+        // Note: LID pattern (^84\d{10,13}$) is a heuristic based on observed WhatsApp behavior.
+        // This pattern can be configured via WHATSAPP_LID_PATTERN env variable if needed.
+        const lidPattern = process.env.WHATSAPP_LID_PATTERN || "^84\\d{10,13}$"
+        const looksLikeLidDerived = new RegExp(lidPattern).test(digits)
         if (looksLikeLidDerived) {
           const mappedPhone = this.lidToPhoneMap.get(digits)
           if (mappedPhone) {
