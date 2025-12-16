@@ -471,38 +471,10 @@ if (!engine) {
         return res.status(400).json({ success: false, error: "Missing session/tenantId" });
       }
 
-      let engine = whatsappManager.getEngine(tenantId);
+      const engine = whatsappManager.getEngine(tenantId);
       if (!engine) {
         console.warn("[Zender Webhook] message: Nenhum engine encontrado para tenant:", tenantId);
-        // Tentativa 1: localizar engine pelo número do próprio bot (body.me.id)
-        try {
-          const meId: string = body?.me?.id || "";
-          const meDigits = meId.replace(/@.*$/, "").replace(/\D/g, "");
-          const engines = whatsappManager.getAllEngines();
-          for (const [, eng] of engines) {
-            const status = eng.getStatus();
-            const botDigits = (status.phoneNumber || "").replace(/\D/g, "");
-            if (botDigits && meDigits && botDigits.endsWith(meDigits)) {
-              engine = eng;
-              console.log(`[Zender Webhook] message: engine resolvido via me.id (${meDigits})`);
-              break;
-            }
-          }
-        } catch {}
-
-        // Tentativa 2: pegar o primeiro engine conectado
-        if (!engine) {
-          const engines = whatsappManager.getAllEngines();
-          const connected = engines.find(([, eng]) => eng.isConnected());
-          if (connected) {
-            engine = connected[1];
-            console.log(`[Zender Webhook] message: usando engine conectado por fallback`);
-          }
-        }
-
-        if (!engine) {
-          return res.status(400).json({ success: false, error: `Engine not found for tenant ${tenantId}` });
-        }
+        return res.status(400).json({ success: false, error: `Engine not found for tenant ${tenantId}` });
       }
 
       // Conteúdo da mensagem

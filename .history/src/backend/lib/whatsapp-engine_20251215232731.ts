@@ -296,8 +296,6 @@ export class WhatsAppEngine {
   private isInitializing = false
   /** Cached client config built from env and defaults */
   private clientConfig: any | null = null
-  /** Last inbound classic chat digits observed for this session (e.g., 55119...) */
-  private lastInboundDigits: string | null = null
 
   /**
    * Build whatsapp-web.js Client configuration with robust Puppeteer flags for Docker/Chromium
@@ -642,16 +640,6 @@ export class WhatsAppEngine {
         console.warn(`[WhatsApp ${this.sessionId}] Received message with missing properties`)
         return
       }
-      // Cache last inbound digits from classic JID to help avoid LID-derived misrouting
-      try {
-        const fromStr: string = String(message.from)
-        const isClassic = fromStr.endsWith("@c.us") || fromStr.endsWith("@s.whatsapp.net")
-        if (isClassic) {
-          this.lastInboundDigits = fromStr.replace(/\D/g, "") || null
-        }
-      } catch {
-        // ignore cache errors
-      }
       this.handlers.onMessage?.({
         from: message.from,
         body: message.body,
@@ -691,20 +679,7 @@ export class WhatsAppEngine {
     try {
       const preferCUS = process.env.WHATSAPP_PREFER_CUS !== "false"
       if (preferCUS) {
-        let digits = String(phoneNumber).replace(/\D/g, "")
-
-        // Heuristic fix: if the target looks like an LID-derived number (commonly starting with 84...)
-        // and we have a recent inbound classic JID cached, prefer that instead to avoid misrouting.
-        // Example: inbound remoteJid was 5511942774485@s.whatsapp.net but remoteJidAlt (LID) was 84027394506995@lid.
-        // If the caller passed 84027394506995, we swap to the last inbound digits 5511942774485.
-        const looksLikeLidDerived = /^84\d{10,13}$/.test(digits)
-        if (looksLikeLidDerived && this.lastInboundDigits) {
-          console.log(
-            `[WhatsApp Engine] Correcting LID-derived target ${digits} -> ${this.lastInboundDigits} based on last inbound`
-          )
-          digits = this.lastInboundDigits
-        }
-
+        const digits = String(phoneNumber).replace(/\D/g, "")
         const chatId = `${digits}@c.us`
         // For new numbers (no prior chat), WhatsApp will still accept direct send to c.us
         // Return immediately to avoid any LID discovery/misrouting.
