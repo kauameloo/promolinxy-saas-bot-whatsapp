@@ -1,13 +1,36 @@
 // Test script to verify date scheduling logic
 console.log("=== Testing Date Scheduling Logic ===\n");
 
-// Simulate the current scheduling logic
-function testCurrentLogic() {
-  console.log("Current Logic Test:");
+// Simulate the NEW (absolute) scheduling logic
+function testNewLogic() {
+  console.log("NEW Logic Test (Absolute from Trigger):");
   const messages = [
     { id: 1, delay_minutes: 0 },
-    { id: 2, delay_minutes: 15 },
-    { id: 3, delay_minutes: 120 },
+    { id: 2, delay_minutes: 30 },
+    { id: 3, delay_minutes: 180 },
+  ];
+
+  const triggerTime = new Date();
+  console.log(`Trigger time: ${triggerTime.toISOString()}`);
+
+  for (const message of messages) {
+    const scheduledFor = new Date(triggerTime);
+    scheduledFor.setMinutes(scheduledFor.getMinutes() + message.delay_minutes);
+    
+    console.log(`Message ${message.id}:`);
+    console.log(`  delay_minutes: ${message.delay_minutes}`);
+    console.log(`  scheduledFor: ${scheduledFor.toISOString()}`);
+    console.log(`  Minutes from trigger: ${message.delay_minutes}\n`);
+  }
+}
+
+// Simulate the OLD (cumulative) scheduling logic
+function testOldLogic() {
+  console.log("\nOLD Logic Test (Cumulative):");
+  const messages = [
+    { id: 1, delay_minutes: 0 },
+    { id: 2, delay_minutes: 30 },
+    { id: 3, delay_minutes: 180 },
   ];
 
   let cumulativeDelay = 0;
@@ -28,28 +51,22 @@ function testCurrentLogic() {
   }
 }
 
-// Test with real timestamps from the issue
-function testWithRealData() {
-  console.log("\n=== Real Data Analysis ===");
-  const createdAt = new Date("2025-12-16T21:40:44.194546Z");
-  console.log(`Webhook received at: ${createdAt.toISOString()}`);
-  
-  const scheduledTimes = [
-    { msg: 1, time: "2025-12-16T21:40:44.119Z", expected_delay: 0 },
-    { msg: 2, time: "2025-12-16T21:55:44.243Z", expected_delay: 15 },
-    { msg: 3, time: "2025-12-16T23:55:44.366Z", expected_delay: 135 },
-  ];
-  
-  scheduledTimes.forEach(({msg, time, expected_delay}) => {
-    const scheduled = new Date(time);
-    const actualDelay = Math.round((scheduled - createdAt) / 1000 / 60);
-    console.log(`Message ${msg}:`);
-    console.log(`  Scheduled: ${scheduled.toISOString()}`);
-    console.log(`  Actual delay: ${actualDelay} minutes`);
-    console.log(`  Expected delay: ${expected_delay} minutes`);
-    console.log(`  Difference: ${actualDelay - expected_delay} minutes\n`);
-  });
+// Comparison for user understanding
+function comparison() {
+  console.log("\n=== COMPARISON ===");
+  console.log("User configures messages with delays: 0, 30, 180 minutes");
+  console.log("\nOLD behavior (cumulative):");
+  console.log("  Message 1: NOW + 0 = NOW");
+  console.log("  Message 2: NOW + (0+30) = 30 min");
+  console.log("  Message 3: NOW + (0+30+180) = 210 min (3.5 hours)");
+  console.log("\nNEW behavior (absolute from trigger):");
+  console.log("  Message 1: Trigger + 0 = NOW");
+  console.log("  Message 2: Trigger + 30 = 30 min");
+  console.log("  Message 3: Trigger + 180 = 180 min (3 hours)");
+  console.log("\n✓ NEW behavior is more intuitive!");
 }
 
-testCurrentLogic();
-testWithRealData();
+testNewLogic();
+testOldLogic();
+comparison();
+

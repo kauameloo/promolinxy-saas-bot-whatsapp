@@ -22,7 +22,7 @@ export class MessageService {
     }
 
     const scheduledMessages: ScheduledMessage[] = []
-    let cumulativeDelay = 0
+    const triggerTime = new Date()
 
     // Prepara variáveis para substituição
     const variables: MessageVariables = {
@@ -53,11 +53,9 @@ export class MessageService {
     for (const message of flow.messages) {
       if (!message.is_active) continue
 
-      cumulativeDelay += message.delay_minutes
-
-      // Calcula horário de envio
-      const scheduledFor = new Date()
-      scheduledFor.setMinutes(scheduledFor.getMinutes() + cumulativeDelay)
+      // Calcula horário de envio a partir do momento do trigger (não cumulativo)
+      const scheduledFor = new Date(triggerTime)
+      scheduledFor.setMinutes(scheduledFor.getMinutes() + message.delay_minutes)
 
       // Processa o template
       const processedContent = parseMessage(message.content, variables)
@@ -77,7 +75,7 @@ export class MessageService {
       })
 
       if (isDebugMode) {
-        console.log(`  → Message scheduled for ${scheduledFor.toISOString()} (delay: ${cumulativeDelay}min)`)
+        console.log(`  → Message scheduled for ${scheduledFor.toISOString()} (delay: ${message.delay_minutes}min from trigger)`)
       }
       scheduledMessages.push(scheduled)
     }
