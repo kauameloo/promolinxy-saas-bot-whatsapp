@@ -70,6 +70,21 @@ const KirvanoPayloadSchema = z.object({
 // Tenant padrão (em produção, viria de header ou API key)
 import { DEFAULT_TENANT_ID } from "@/lib/constants/config"
 
+/**
+ * Parses a price string like "R$ 16,90" to a number
+ */
+function parsePriceString(priceStr: string | number | undefined): number {
+  if (typeof priceStr === "number") return priceStr
+  if (!priceStr) return 0
+
+  // Remove currency symbols, spaces, and convert comma to dot
+  const cleaned = String(priceStr)
+    .replace(/[R$\s]/g, "")
+    .replace(",", ".")
+  const parsed = parseFloat(cleaned)
+  return isNaN(parsed) ? 0 : parsed
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse>> {
   try {
     // Lê o body como texto para verificação de assinatura
@@ -96,36 +111,40 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
                 document: d.customer.document || d.customer.docNumber || undefined,
               }
             : undefined,
-          product: d.product
+          product: d.product || (d.products && d.products[0])
             ? {
-                id: String(d.product.id || d.product.short_id || ""),
-                name: String(d.product.name || "Produto"),
-                price: d.product.price || d.amount || d.baseAmount || 0,
+                id: String((d.product?.id || d.products?.[0]?.id) || (d.product?.short_id || d.products?.[0]?.short_id) || ""),
+                name: String((d.product?.name || d.products?.[0]?.name) || "Produto"),
+                price: d.fiscal?.original_value || d.fiscal?.total_value || parsePriceString(d.product?.price || d.products?.[0]?.price) || d.amount || d.baseAmount || 0,
               }
             : undefined,
           payment:
-            d.payment || d.paymentMethod || d.amount || d.pix || d.boleto
+            d.payment || d.paymentMethod || d.amount || d.pix || d.boleto || d.fiscal
               ? {
                   method: d.payment?.method || d.paymentMethod || "",
-                  amount: d.payment?.amount || d.amount || d.baseAmount || 0,
+                  amount: d.fiscal?.total_value || d.fiscal?.original_value || d.payment?.amount || d.amount || d.baseAmount || 0,
                   status: d.payment?.status || d.status || "",
-                  boleto_url: d.payment?.boletoUrl || d.boleto?.boletoUrl || undefined,
-                  pix_code: d.payment?.pixCode || d.pix?.qrCode || undefined,
-                  pix_qrcode: d.payment?.pixQrCode || d.pix?.qrCode || undefined,
-                  checkout_url: d.payment?.checkoutUrl || d.checkoutUrl || undefined,
+                  boleto_url: d.payment?.boletoUrl || d.payment?.boleto_url || d.boleto?.boletoUrl || undefined,
+                  pix_code: d.payment?.pixCode || d.payment?.pix_code || d.payment?.qrcode || d.pix?.qrCode || undefined,
+                  pix_qrcode: d.payment?.pixQrCode || d.payment?.pix_qrcode || d.payment?.qrcode_image || d.pix?.qrCode || undefined,
+                  checkout_url: d.payment?.checkoutUrl || d.payment?.checkout_url || d.checkoutUrl || d.checkout_url || undefined,
                 }
               : undefined,
           metadata: {
             ...d.metadata,
+            sale_id: d.sale_id,
             affiliate: d.affiliate,
-            fees: d.fees,
+            fees: d.fees || d.fee,
             discount: d.discount,
             installments: d.installments,
-            utm_source: d.utm_source,
-            utm_medium: d.utm_medium,
-            utm_campaign: d.utm_campaign,
-            utm_term: d.utm_term,
-            utm_content: d.utm_content,
+            fiscal: d.fiscal,
+            utm_source: d.utm_source || d.utm?.utm_source,
+            utm_medium: d.utm_medium || d.utm?.utm_medium,
+            utm_campaign: d.utm_campaign || d.utm?.utm_campaign,
+            utm_term: d.utm_term || d.utm?.utm_term,
+            utm_content: d.utm_content || d.utm?.utm_content,
+            checkout_url: d.checkout_url,
+            total_price: d.total_price,
           },
           timestamp: d.timestamp || d.createdAt || new Date().toISOString(),
         }
@@ -145,36 +164,40 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
                 document: raw.customer.document || raw.customer.docNumber || undefined,
               }
             : undefined,
-          product: raw.product
+          product: raw.product || (raw.products && raw.products[0])
             ? {
-                id: String(raw.product.id || raw.product.short_id || ""),
-                name: String(raw.product.name || "Produto"),
-                price: raw.product.price || raw.amount || raw.baseAmount || 0,
+                id: String((raw.product?.id || raw.products?.[0]?.id) || (raw.product?.short_id || raw.products?.[0]?.short_id) || ""),
+                name: String((raw.product?.name || raw.products?.[0]?.name) || "Produto"),
+                price: raw.fiscal?.original_value || raw.fiscal?.total_value || parsePriceString(raw.product?.price || raw.products?.[0]?.price) || raw.amount || raw.baseAmount || 0,
               }
             : undefined,
           payment:
-            raw.payment || raw.paymentMethod || raw.amount || raw.pix || raw.boleto
+            raw.payment || raw.paymentMethod || raw.amount || raw.pix || raw.boleto || raw.fiscal
               ? {
                   method: raw.payment?.method || raw.paymentMethod || "",
-                  amount: raw.payment?.amount || raw.amount || raw.baseAmount || 0,
+                  amount: raw.fiscal?.total_value || raw.fiscal?.original_value || raw.payment?.amount || raw.amount || raw.baseAmount || 0,
                   status: raw.payment?.status || raw.status || "",
-                  boleto_url: raw.payment?.boletoUrl || raw.boleto?.boletoUrl || undefined,
-                  pix_code: raw.payment?.pixCode || raw.pix?.qrCode || undefined,
-                  pix_qrcode: raw.payment?.pixQrCode || raw.pix?.qrCode || undefined,
-                  checkout_url: raw.payment?.checkoutUrl || raw.checkoutUrl || undefined,
+                  boleto_url: raw.payment?.boletoUrl || raw.payment?.boleto_url || raw.boleto?.boletoUrl || undefined,
+                  pix_code: raw.payment?.pixCode || raw.payment?.pix_code || raw.payment?.qrcode || raw.pix?.qrCode || undefined,
+                  pix_qrcode: raw.payment?.pixQrCode || raw.payment?.pix_qrcode || raw.payment?.qrcode_image || raw.pix?.qrCode || undefined,
+                  checkout_url: raw.payment?.checkoutUrl || raw.payment?.checkout_url || raw.checkoutUrl || raw.checkout_url || undefined,
                 }
               : undefined,
           metadata: {
             ...raw.metadata,
+            sale_id: raw.sale_id,
             affiliate: raw.affiliate,
-            fees: raw.fees,
+            fees: raw.fees || raw.fee,
             discount: raw.discount,
             installments: raw.installments,
-            utm_source: raw.utm_source,
-            utm_medium: raw.utm_medium,
-            utm_campaign: raw.utm_campaign,
-            utm_term: raw.utm_term,
-            utm_content: raw.utm_content,
+            fiscal: raw.fiscal,
+            utm_source: raw.utm_source || raw.utm?.utm_source,
+            utm_medium: raw.utm_medium || raw.utm?.utm_medium,
+            utm_campaign: raw.utm_campaign || raw.utm?.utm_campaign,
+            utm_term: raw.utm_term || raw.utm?.utm_term,
+            utm_content: raw.utm_content || raw.utm?.utm_content,
+            checkout_url: raw.checkout_url,
+            total_price: raw.total_price,
           },
           timestamp: raw.timestamp || raw.createdAt || new Date().toISOString(),
         }
