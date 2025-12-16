@@ -88,11 +88,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
           event: raw.event,
           order_id: d.orderId || d.order_id || d.id || undefined,
           transaction_id: d.transactionId || d.transaction_id || d.refId || undefined,
-          customer: d.customer && (d.customer.phone || d.customer.cellphone || d.customer.celular || d.customer.mobile || d.customer.telefone)
+          customer: d.customer && (d.customer.phone || d.customer.phone_number || d.customer.cellphone || d.customer.celular || d.customer.mobile || d.customer.telefone)
             ? {
                 name: d.customer.name || "",
                 email: d.customer.email || undefined,
-                phone: String(d.customer.phone || d.customer.cellphone || d.customer.celular || d.customer.mobile || d.customer.telefone),
+                phone: String(d.customer.phone || d.customer.phone_number || d.customer.cellphone || d.customer.celular || d.customer.mobile || d.customer.telefone),
                 document: d.customer.document || d.customer.docNumber || undefined,
               }
             : undefined,
@@ -137,11 +137,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
           event: raw.event,
           order_id: raw.orderId || raw.order_id || raw.id || undefined,
           transaction_id: raw.transactionId || raw.transaction_id || raw.refId || undefined,
-          customer: raw.customer && (raw.customer.phone || raw.customer.cellphone || raw.customer.celular || raw.customer.mobile || raw.customer.telefone)
+          customer: raw.customer && (raw.customer.phone || raw.customer.phone_number || raw.customer.cellphone || raw.customer.celular || raw.customer.mobile || raw.customer.telefone)
             ? {
                 name: raw.customer.name || "",
                 email: raw.customer.email || undefined,
-                phone: String(raw.customer.phone || raw.customer.cellphone || raw.customer.celular || raw.customer.mobile || raw.customer.telefone),
+                phone: String(raw.customer.phone || raw.customer.phone_number || raw.customer.cellphone || raw.customer.celular || raw.customer.mobile || raw.customer.telefone),
                 document: raw.customer.document || raw.customer.docNumber || undefined,
               }
             : undefined,
