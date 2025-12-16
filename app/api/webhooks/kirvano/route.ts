@@ -88,11 +88,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
           event: raw.event,
           order_id: d.orderId || d.order_id || d.id || undefined,
           transaction_id: d.transactionId || d.transaction_id || d.refId || undefined,
-          customer: d.customer && (d.customer.phone || d.customer.cellphone)
+          customer: d.customer && (d.customer.phone || d.customer.cellphone || d.customer.celular || d.customer.mobile || d.customer.telefone)
             ? {
                 name: d.customer.name || "",
                 email: d.customer.email || undefined,
-                phone: String(d.customer.phone || d.customer.cellphone),
+                phone: String(d.customer.phone || d.customer.cellphone || d.customer.celular || d.customer.mobile || d.customer.telefone),
                 document: d.customer.document || d.customer.docNumber || undefined,
               }
             : undefined,
@@ -132,8 +132,67 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
 
         payload = mapped
       } else {
-        // Handle flat structure or already normalized payload
-        payload = raw as KirvanoWebhookPayload
+        // Handle flat structure - map customer, product, payment fields
+        const mapped: KirvanoWebhookPayload = {
+          event: raw.event,
+          order_id: raw.orderId || raw.order_id || raw.id || undefined,
+          transaction_id: raw.transactionId || raw.transaction_id || raw.refId || undefined,
+          customer: raw.customer && (raw.customer.phone || raw.customer.cellphone || raw.customer.celular || raw.customer.mobile || raw.customer.telefone)
+            ? {
+                name: raw.customer.name || "",
+                email: raw.customer.email || undefined,
+                phone: String(raw.customer.phone || raw.customer.cellphone || raw.customer.celular || raw.customer.mobile || raw.customer.telefone),
+                document: raw.customer.document || raw.customer.docNumber || undefined,
+              }
+            : undefined,
+          product: raw.product
+            ? {
+                id: String(raw.product.id || raw.product.short_id || ""),
+                name: String(raw.product.name || "Produto"),
+                price: raw.product.price || raw.amount || raw.baseAmount || 0,
+              }
+            : undefined,
+          payment:
+            raw.payment || raw.paymentMethod || raw.amount || raw.pix || raw.boleto
+              ? {
+                  method: raw.payment?.method || raw.paymentMethod || "",
+                  amount: raw.payment?.amount || raw.amount || raw.baseAmount || 0,
+                  status: raw.payment?.status || raw.status || "",
+                  boleto_url: raw.payment?.boletoUrl || raw.boleto?.boletoUrl || undefined,
+                  pix_code: raw.payment?.pixCode || raw.pix?.qrCode || undefined,
+                  pix_qrcode: raw.payment?.pixQrCode || raw.pix?.qrCode || undefined,
+                  checkout_url: raw.payment?.checkoutUrl || raw.checkoutUrl || undefined,
+                }
+              : undefined,
+          metadata: {
+            ...raw.metadata,
+            affiliate: raw.affiliate,
+            fees: raw.fees,
+            discount: raw.discount,
+            installments: raw.installments,
+            utm_source: raw.utm_source,
+            utm_medium: raw.utm_medium,
+            utm_campaign: raw.utm_campaign,
+            utm_term: raw.utm_term,
+            utm_content: raw.utm_content,
+          },
+          timestamp: raw.timestamp || raw.createdAt || new Date().toISOString(),
+        }
+
+        payload = mapped
+      }
+
+      // Debug logging para identificar problemas com customer data
+      if (process.env.NODE_ENV === "development" || process.env.WEBHOOK_DEBUG_LOG === "true") {
+        if (payload.customer) {
+          console.log("✓ Customer data extracted:", {
+            name: payload.customer.name,
+            phone: payload.customer.phone,
+            email: payload.customer.email,
+          })
+        } else {
+          console.log("⚠ No customer data extracted. Raw customer object:", JSON.stringify((JSON.parse(rawBody)).customer, null, 2))
+        }
       }
     } catch {
       return NextResponse.json({ success: false, error: "Invalid JSON payload" }, { status: 400 })
