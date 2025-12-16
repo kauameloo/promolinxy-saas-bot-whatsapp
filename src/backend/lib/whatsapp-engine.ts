@@ -296,8 +296,8 @@ export class WhatsAppEngine {
   private isInitializing = false
   /** Cached client config built from env and defaults */
   private clientConfig: any | null = null
-  /** Last inbound classic chat digits observed for this session (e.g., 55119...) */
-  private lastInboundDigits: string | null = null
+  /** Map of LID numbers to their corresponding classic phone numbers to avoid misrouting */
+  private lidToPhoneMap: Map<string, string> = new Map()
 
   /**
    * Build whatsapp-web.js Client configuration with robust Puppeteer flags for Docker/Chromium
@@ -642,12 +642,29 @@ export class WhatsAppEngine {
         console.warn(`[WhatsApp ${this.sessionId}] Received message with missing properties`)
         return
       }
-      // Cache last inbound digits from classic JID to help avoid LID-derived misrouting
+      // Cache LID to phone mapping to help avoid misrouting
       try {
+        const msgAny = message as any
         const fromStr: string = String(message.from)
+        
+        // Extract classic phone number
         const isClassic = fromStr.endsWith("@c.us") || fromStr.endsWith("@s.whatsapp.net")
         if (isClassic) {
-          this.lastInboundDigits = fromStr.replace(/\D/g, "") || null
+          const classicDigits = fromStr.replace(/\D/g, "")
+          
+          // Check if there's an alternate LID identifier
+          // WhatsApp Web.js may expose id.user and id.server separately
+          if (msgAny.id && msgAny.id.remote) {
+            const remote = String(msgAny.id.remote)
+            // If remote contains LID (@lid), map it to classic number
+            if (remote.includes("@lid")) {
+              const lidDigits = remote.replace(/\D/g, "")
+              if (lidDigits && classicDigits && lidDigits !== classicDigits) {
+                this.lidToPhoneMap.set(lidDigits, classicDigits)
+                console.log(`[WhatsApp Engine] Mapped LID ${lidDigits} -> ${classicDigits}`)
+              }
+            }
+          }
         }
       } catch {
         // ignore cache errors
@@ -694,15 +711,22 @@ export class WhatsAppEngine {
         let digits = String(phoneNumber).replace(/\D/g, "")
 
         // Heuristic fix: if the target looks like an LID-derived number (commonly starting with 84...)
-        // and we have a recent inbound classic JID cached, prefer that instead to avoid misrouting.
+        // check our LID to phone mapping to get the correct classic number.
         // Example: inbound remoteJid was 5511942774485@s.whatsapp.net but remoteJidAlt (LID) was 84027394506995@lid.
-        // If the caller passed 84027394506995, we swap to the last inbound digits 5511942774485.
+        // If the caller passed 84027394506995, we swap to the mapped classic digits 5511942774485.
         const looksLikeLidDerived = /^84\d{10,13}$/.test(digits)
-        if (looksLikeLidDerived && this.lastInboundDigits) {
-          console.log(
-            `[WhatsApp Engine] Correcting LID-derived target ${digits} -> ${this.lastInboundDigits} based on last inbound`
-          )
-          digits = this.lastInboundDigits
+        if (looksLikeLidDerived) {
+          const mappedPhone = this.lidToPhoneMap.get(digits)
+          if (mappedPhone) {
+            console.log(
+              `[WhatsApp Engine] Correcting LID-derived target ${digits} -> ${mappedPhone} using LID map`
+            )
+            digits = mappedPhone
+          } else {
+            console.warn(
+              `[WhatsApp Engine] LID-derived number ${digits} found but no mapping exists. Message may be misrouted.`
+            )
+          }
         }
 
         const chatId = `${digits}@c.us`
