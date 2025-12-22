@@ -151,7 +151,7 @@ function MessageItem({
             />
           </div>
           <div className="space-y-2">
-            <Label>Delay (minutos)</Label>
+            <Label>Delay (minutos após o evento)</Label>
             <Input
               type="number"
               min={0}
@@ -163,6 +163,9 @@ function MessageItem({
                 })
               }
             />
+            <p className="text-xs text-muted-foreground">
+              Tempo de espera desde o evento que acionou o fluxo
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={handleSave} disabled={isSaving} size="sm">
@@ -211,7 +214,7 @@ function MessageItem({
               <Clock className="h-3 w-3" />
               {message.delay_minutes === 0
                 ? "Envio imediato"
-                : `${message.delay_minutes} min após anterior`}
+                : `${message.delay_minutes} min após o evento`}
             </div>
 
             <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -726,7 +729,7 @@ Posso te ajudar com alguma dúvida?`,
                   )}
 
                   <div className="space-y-2">
-                    <Label>Delay (minutos após mensagem anterior)</Label>
+                    <Label>Delay (minutos após o evento)</Label>
                     <Input
                       type="number"
                       min={0}
@@ -739,8 +742,7 @@ Posso te ajudar com alguma dúvida?`,
                       }
                     />
                     <p className="text-xs text-muted-foreground">
-                      0 = envio imediato, 60 = 1 hora depois, 1440 = 24 horas
-                      depois
+                      Tempo desde o evento: 0 = imediato, 30 = 30min, 60 = 1h, 1440 = 24h
                     </p>
                   </div>
 
