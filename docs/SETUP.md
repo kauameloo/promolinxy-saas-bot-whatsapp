@@ -29,19 +29,19 @@ Existe um arquivo de exemplo `.env.example` no repositório.
 
 1. Copie para `.env`:
 
-```bash
+\`\`\`bash
 cp .env.example .env
 # ou em PowerShell
 # copy .env.example .env
-```
+\`\`\`
 
 2. Ajuste os valores: `JWT_SECRET`, `CAKTO_WEBHOOK_SECRET`, `DATABASE_URL` etc.
 
 - Se você for usar o `docker compose` provido, deixe o `DATABASE_URL` apontando para o serviço `postgres` como no `.env.example`:
 
-```
+\`\`\`
 DATABASE_URL=postgresql://saasbot:saasbot123@postgres:5432/saasbot
-```
+\`\`\`
 
 - Para rodar somente o frontend em dev use um Postgres local ou uma string SQLite/Neon conforme seu ambiente.
 
@@ -53,7 +53,7 @@ Eu removi a chave `version: '3.8'` do `docker-compose.yml` para evitar a mensage
 
 2. Para subir toda a stack:
 
-```bash
+\`\`\`bash
 # Use o plugin moderno (recomendado)
 docker compose up --build -d
 
@@ -62,7 +62,7 @@ docker compose logs -f
 
 # Ver status
 docker compose ps
-```
+\`\`\`
 
 3. O dashboard ficará disponível em `http://localhost:3000` (ou `http://127.0.0.1:3000`).
 
@@ -72,13 +72,13 @@ Observação: se você usa `docker-compose` (com hífen) e esse binário não fu
 
 Se preferir desenvolver apenas no Next.js localmente:
 
-```bash
+\`\`\`bash
 pnpm install
 pnpm dev
 # ou
 npm install
 npm run dev
-```
+\`\`\`
 
 - Lembre-se de configurar `.env` com `DATABASE_URL` e `JWT_SECRET` se endpoints server-side precisarem acessar o DB em rotas durante o desenvolvimento.
 
@@ -86,9 +86,9 @@ npm run dev
 
 Mensagem típica:
 
-```
+\`\`\`
 unable to get image 'postgres:16-alpine': error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.51/images/postgres:16-alpine/json": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
-```
+\`\`\`
 
 Causa: o CLI `docker` não conseguiu se conectar ao daemon do Docker (Docker Desktop não está rodando ou o serviço falhou).
 
@@ -97,10 +97,10 @@ Soluções:
 1. Abra o Docker Desktop via o menu Iniciar e espere o ícone indicar que o Docker está pronto ("Docker is running").
 2. Rode no terminal:
 
-```bash
+\`\`\`bash
 docker info
 docker version
-```
+\`\`\`
 
 Se esses comandos retornarem informação, o daemon está OK. Se aparecer erro, o Docker não está rodando.
 
@@ -108,15 +108,15 @@ Se esses comandos retornarem informação, o daemon está OK. Se aparecer erro, 
 
 4. Verifique o serviço (PowerShell como administrador):
 
-```powershell
+\`\`\`powershell
 Get-Service -Name com.docker.service
-```
+\`\`\`
 
 5. Use `docker compose` em vez de `docker-compose`:
 
-```bash
+\`\`\`bash
 docker compose up --build -d
-```
+\`\`\`
 
 6. Caso não tenha Docker Desktop instalado, instale-o seguindo as instruções da documentação oficial do Docker e habilite o WSL2 backend se estiver no Windows.
 
@@ -126,9 +126,9 @@ Se você receber erros do tipo "cannot copy to non-directory" ou problemas ao co
 
 Mensagem que apareceu durante `next dev`:
 
-```
+\`\`\`
 Database query error: TypeError: sql is not a function
-```
+\`\`\`
 
 Possíveis causas e correções:
 
@@ -137,15 +137,15 @@ Possíveis causas e correções:
 
 Exemplo (local usando container PostgreSQL do compose):
 
-```
+\`\`\`
 DATABASE_URL=postgresql://saasbot:saasbot123@localhost:5432/saasbot
-```
+\`\`\`
 
 ou, se estiver rodando o frontend dentro do container via compose, use `postgres` como host (nome do serviço do compose):
 
-```
+\`\`\`
 DATABASE_URL=postgresql://saasbot:saasbot123@postgres:5432/saasbot
-```
+\`\`\`
 
 Importante: depois de ajustar `.env` reinicie o `next dev`.
 
@@ -162,20 +162,20 @@ Opção B — usar fonte específica (Inter) localmente via npm (recomendado se 
 
 1. Instale o pacote:
 
-```bash
+\`\`\`bash
 pnpm add @fontsource/inter
 # ou
 npm install @fontsource/inter
-```
+\`\`\`
 
 2. Importe no topo de `app/globals.css` ou do seu arquivo de estilo global:
 
-```css
+\`\`\`css
 @import "@fontsource/inter/variable.css"; /* importa a variante variável */
 :root {
   --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-```
+\`\`\`
 
 3. Reinicie o servidor. As fontes serão servidas localmente a partir do bundle (node_modules) sem ida ao Google CDN.
 
@@ -185,16 +185,16 @@ Opção C — adicionar arquivos de fonte em `/public/fonts` e usar `@font-face`
 
 - Logs de containers:
 
-```bash
+\`\`\`bash
 docker compose logs -f
-```
+\`\`\`
 
 - Logs do Next dev:
 
-```bash
+\`\`\`bash
 pnpm dev
 # veja o output no terminal
-```
+\`\`\`
 
 - Se uma rota do servidor (API) der erro `TypeError: sql is not a function`, confirme `DATABASE_URL` e reinicie o processo que está executando a aplicação.
 

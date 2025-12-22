@@ -1,0 +1,8 @@
+{
+  "event": "button_click",
+  "session": "TENANT_ID_HERE",
+  "data": {
+    "from": "5511976857586@c.us",
+    "selectedId": "OPCAO_1"
+  }
+}

@@ -48,7 +48,7 @@ Passando para lembrar que seu boleto do *{{produto}}* vence em breve!
 Não perca essa oportunidade! O valor de *{{preco}}* é um investimento que vai transformar seus resultados.
 
 {{link_boleto}}`,
-        delay_minutes: 1440, // 24 horas
+        delay_minutes: 1440, // 24 horas do trigger
       },
       {
         content: `{{nome}}, última chance! ⚠️
@@ -62,7 +62,7 @@ Por apenas *{{preco}}*, você terá acesso a tudo que precisa para alcançar seu
 👉 {{link_boleto}}
 
 Pague agora e garanta seu acesso!`,
-        delay_minutes: 2880, // 48 horas após a primeira
+        delay_minutes: 2880, // 48 horas do trigger
       },
     ],
   },
@@ -202,7 +202,7 @@ Por apenas *{{preco}}*, você pode transformar essa vontade em realidade.
 👉 {{link_checkout}}
 
 O que está te impedindo? Me conta que eu ajudo!`,
-        delay_minutes: 180, // 3 horas
+        delay_minutes: 180, // 3 horas do trigger
       },
       {
         content: `{{nome}}, última mensagem sobre isso, prometo! 🤝
@@ -219,7 +219,7 @@ Se não for agora, tudo bem. Mas se for... o link está aqui:
 {{link_checkout}}
 
 Sucesso! 🚀`,
-        delay_minutes: 1440, // 24 horas
+        delay_minutes: 1440, // 24 horas do trigger
       },
     ],
   },

@@ -1,0 +1,15 @@
+{
+  "event": "message",
+  "session": "TENANT_ID_HERE",
+  "me": { "id": "559999999999@s.whatsapp.net" },
+  "payload": {
+    "from": "84027394506995@lid",
+    "body": "Olá",
+    "_data": {
+      "key": {
+        "remoteJid": "84027394506995@lid",
+        "remoteJidAlt": "5511976857586@s.whatsapp.net"
+      }
+    }
+  }
+}

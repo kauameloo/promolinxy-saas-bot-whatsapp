@@ -16,13 +16,13 @@ The application was experiencing 500 Internal Server Errors on the following API
 
 **Fix**: Updated the `query()` and `remove()` functions to use the correct Neon driver API:
 
-```typescript
+\`\`\`typescript
 // Before (INCORRECT):
 const result = await sqlInstance.query(queryText, params)
 
 // After (CORRECT):
 const result = await sqlInstance(queryText, params || [])
-```
+\`\`\`
 
 ### 2. Missing Build-Time Environment Variables
 
@@ -30,21 +30,21 @@ const result = await sqlInstance(queryText, params || [])
 
 **Fix**: Updated `Dockerfile.frontend` to accept `NEXT_PUBLIC_API_URL` as a build argument:
 
-```dockerfile
+\`\`\`dockerfile
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-```
+\`\`\`
 
 And updated `docker-compose.yml` to pass the build argument:
 
-```yaml
+\`\`\`yaml
 frontend:
   build:
     context: .
     dockerfile: Dockerfile.frontend
     args:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
-```
+\`\`\`
 
 ### 3. Insufficient Error Logging
 
@@ -52,7 +52,7 @@ frontend:
 
 **Fix**: Enhanced error handling in all affected API routes to log detailed error messages and return error details in development mode:
 
-```typescript
+\`\`\`typescript
 catch (error) {
   console.error("API error:", error)
   const errorMessage = error instanceof Error ? error.message : "Error message"
@@ -62,7 +62,7 @@ catch (error) {
     details: process.env.NODE_ENV === "development" ? String(error) : undefined
   }, { status: 500 })
 }
-```
+\`\`\`
 
 ## Files Modified
 
@@ -95,16 +95,16 @@ catch (error) {
 ### For VPS Deployment with Docker Compose
 
 1. **Update your `.env` file** to include the public API URL:
-   ```bash
+   \`\`\`bash
    # For production deployment
    NEXT_PUBLIC_API_URL=https://www.promolinxy.online
    
    # Or if API is on a different domain
    NEXT_PUBLIC_API_URL=https://api.promolinxy.online
-   ```
+   \`\`\`
 
 2. **Rebuild the Docker containers** with the new configuration:
-   ```bash
+   \`\`\`bash
    # Stop existing containers
    docker-compose down
    
@@ -113,16 +113,16 @@ catch (error) {
    
    # Start the services
    docker-compose up -d
-   ```
+   \`\`\`
 
 3. **Verify the deployment**:
-   ```bash
+   \`\`\`bash
    # Check container logs
    docker-compose logs -f frontend
    
    # Test the API endpoints
    curl https://www.promolinxy.online/api/dashboard/stats
-   ```
+   \`\`\`
 
 ### For Vercel Deployment (Frontend Only)
 
@@ -138,23 +138,23 @@ If deploying the frontend to Vercel:
 ### For Local Development
 
 1. **Update `.env` file**:
-   ```bash
+   \`\`\`bash
    NEXT_PUBLIC_API_URL=http://localhost:3000
    DATABASE_URL=your-database-connection-string
    JWT_SECRET=your-secret-key
-   ```
+   \`\`\`
 
 2. **Install dependencies and run**:
-   ```bash
+   \`\`\`bash
    npm install
    npm run dev
-   ```
+   \`\`\`
 
 ## Testing the Fix
 
 After deployment, test each endpoint:
 
-```bash
+\`\`\`bash
 # Replace with your actual domain
 BASE_URL="https://www.promolinxy.online"
 
@@ -169,7 +169,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" "$BASE_URL/api/events?limit=5"
 
 # Test auth/me endpoint (requires authentication)
 curl -H "Authorization: Bearer YOUR_TOKEN" $BASE_URL/api/auth/me
-```
+\`\`\`
 
 ## Additional Notes
 
@@ -196,31 +196,31 @@ curl -H "Authorization: Bearer YOUR_TOKEN" $BASE_URL/api/auth/me
 ### If you still see 500 errors:
 
 1. **Check Docker logs**:
-   ```bash
+   \`\`\`bash
    docker-compose logs frontend
-   ```
+   \`\`\`
 
 2. **Verify DATABASE_URL is set correctly**:
-   ```bash
+   \`\`\`bash
    docker-compose exec frontend env | grep DATABASE_URL
-   ```
+   \`\`\`
 
 3. **Test database connection manually**:
-   ```bash
+   \`\`\`bash
    # Connect to the database using psql or your preferred client
    psql "YOUR_DATABASE_URL"
-   ```
+   \`\`\`
 
 4. **Check if tables exist**:
-   ```sql
+   \`\`\`sql
    SELECT table_name FROM information_schema.tables 
    WHERE table_schema = 'public';
-   ```
+   \`\`\`
 
 5. **Ensure the database schema is up to date**:
-   ```bash
+   \`\`\`bash
    psql "YOUR_DATABASE_URL" -f scripts/001-create-database-schema.sql
-   ```
+   \`\`\`
 
 ## Monitoring
 

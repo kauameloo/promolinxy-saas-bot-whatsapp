@@ -10,7 +10,7 @@ Este documento detalha a estrutura dos webhooks da Cakto, os dados capturados pe
 
 Todos os webhooks da Cakto seguem esta estrutura base:
 
-```typescript
+\`\`\`typescript
 interface CaktoWebhookPayload {
   event: CaktoEventType                // Tipo do evento (obrigatório, vem da URL)
   transaction_id?: string              // ID da transação
@@ -20,18 +20,18 @@ interface CaktoWebhookPayload {
   metadata?: Record<string, unknown>   // Metadados adicionais
   timestamp?: string                   // Timestamp do evento
 }
-```
+\`\`\`
 
 ### Dados do Cliente (customer)
 
-```typescript
+\`\`\`typescript
 interface CustomerData {
   name: string        // Nome do cliente (obrigatório)
   email?: string      // Email do cliente
   phone: string       // Telefone (obrigatório para criar fluxos)
   document?: string   // CPF/CNPJ
 }
-```
+\`\`\`
 
 **Importante:** 
 - O telefone é essencial para o envio de mensagens WhatsApp
@@ -40,17 +40,17 @@ interface CustomerData {
 
 ### Dados do Produto (product)
 
-```typescript
+\`\`\`typescript
 interface ProductData {
   id: string      // ID do produto
   name: string    // Nome do produto
   price: number   // Preço do produto
 }
-```
+\`\`\`
 
 ### Dados do Pagamento (payment)
 
-```typescript
+\`\`\`typescript
 interface PaymentData {
   method: string           // Método de pagamento (credit_card, pix, boleto, etc)
   amount: number           // Valor do pagamento
@@ -60,7 +60,7 @@ interface PaymentData {
   pix_qrcode?: string      // QR Code PIX (alternativa ao pix_code)
   checkout_url?: string    // URL do checkout
 }
-```
+\`\`\`
 
 **Nota:** O sistema aceita tanto `pix_code` quanto `pix_qrcode`. Se ambos estiverem presentes, `pix_code` tem prioridade.
 
@@ -152,7 +152,7 @@ As seguintes variáveis são extraídas do webhook e disponibilizadas nos templa
 
 O sistema agora registra logs detalhados em cada etapa do processamento:
 
-```
+\`\`\`
 === CAKTO WEBHOOK RECEIVED ===
 Event Type: pix_gerado
 Transaction ID: TRX-67890-TEST
@@ -194,7 +194,7 @@ Message variables for flow: {
   → Message scheduled for 2024-12-04T03:45:00Z (delay: 30min)
 ✓ Scheduled 2 message(s) from flow "PIX Gerado - Conversão Rápida"
 ✓ Webhook uuid processed successfully
-```
+\`\`\`
 
 ### Avisos e Erros
 
@@ -227,17 +227,17 @@ O sistema emite avisos quando dados importantes estão ausentes:
 
 Use o script fornecido em `/tmp/test-webhooks.sh`:
 
-```bash
+\`\`\`bash
 # Definir a URL base (padrão: http://localhost:3000)
 export WEBHOOK_BASE_URL=http://localhost:3000
 
 # Executar testes
 /tmp/test-webhooks.sh
-```
+\`\`\`
 
 ### Via cURL Manual
 
-```bash
+\`\`\`bash
 curl -X POST http://localhost:3000/api/webhooks/cakto/pix_gerado \
   -H "Content-Type: application/json" \
   -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
@@ -261,7 +261,7 @@ curl -X POST http://localhost:3000/api/webhooks/cakto/pix_gerado \
       "checkout_url": "https://..."
     }
   }'
-```
+\`\`\`
 
 ## Configuração na Cakto
 

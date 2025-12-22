@@ -100,7 +100,11 @@ export class AnalyticsService {
     )
 
     return results.map((r) => ({
-      date: new Date(r.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      date: new Date(r.date).toLocaleDateString("pt-BR", { 
+        day: "2-digit", 
+        month: "2-digit",
+        timeZone: "America/Sao_Paulo" 
+      }),
       sent: Number.parseInt(r.sent),
       delivered: Number.parseInt(r.delivered),
       read: Number.parseInt(r.read),

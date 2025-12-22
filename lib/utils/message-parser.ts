@@ -79,9 +79,9 @@ export function formatCurrency(value: number): string {
 }
 
 /**
- * Formata data para exibição
+ * Formata data para exibição no horário do Brasil
  */
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string, timezone = "America/Sao_Paulo"): string {
   const d = typeof date === "string" ? new Date(date) : date
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
@@ -89,6 +89,7 @@ export function formatDate(date: Date | string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: timezone,
   }).format(d)
 }
 

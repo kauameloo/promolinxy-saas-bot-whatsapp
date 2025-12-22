@@ -2,7 +2,7 @@
 # DOCKERFILE - Backend WhatsApp Engine
 # =====================================================
 
-FROM node:20-slim
+FROM node:20
 
 # Instala dependências do Puppeteer/Chrome
 RUN apt-get update && apt-get install -y \

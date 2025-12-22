@@ -33,7 +33,7 @@ Previously, API calls like `/api/auth/login` would always route to the frontend'
   - Security considerations
 
 ## Changes Summary
-```
+\`\`\`
 5 files changed:
 - .env.example: +14 lines
 - docs/API_URL_CONFIGURATION.md: +156 lines (new file)
@@ -42,7 +42,7 @@ Previously, API calls like `/api/auth/login` would always route to the frontend'
 - lib/utils/api-url.ts: +31 lines (new file)
 
 Total: +213 insertions, -6 deletions
-```
+\`\`\`
 
 ## How to Use
 
@@ -51,9 +51,9 @@ No changes needed! Will automatically use `http://localhost:3000`
 
 ### For Production Deployment
 1. Set environment variable:
-   ```bash
+   \`\`\`bash
    NEXT_PUBLIC_API_URL=https://api.promolinxy.online
-   ```
+   \`\`\`
 
 2. On Vercel:
    - Settings → Environment Variables
@@ -61,10 +61,10 @@ No changes needed! Will automatically use `http://localhost:3000`
    - Redeploy
 
 3. On Docker:
-   ```yaml
+   \`\`\`yaml
    environment:
      - NEXT_PUBLIC_API_URL=https://api.promolinxy.online
-   ```
+   \`\`\`
 
 ## Testing Performed
 ✅ Build succeeds without errors
@@ -75,17 +75,17 @@ No changes needed! Will automatically use `http://localhost:3000`
 
 ## API Call Flow
 **Before:**
-```
+\`\`\`
 Component → fetch("/api/auth/login")
          → https://www.promolinxy.online/api/auth/login ❌
-```
+\`\`\`
 
 **After:**
-```
+\`\`\`
 Component → useApi("/api/auth/login")
          → getApiUrl("/api/auth/login")
          → https://api.promolinxy.online/api/auth/login ✅
-```
+\`\`\`
 
 ## Benefits
 1. ✅ Flexible deployment architecture (separate frontend/backend)

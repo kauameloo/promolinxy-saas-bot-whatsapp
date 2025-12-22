@@ -15,13 +15,13 @@ Before deploying the fixes to production, ensure you have completed these steps:
 
 - [ ] Confirm database is accessible from your deployment environment
 - [ ] Verify database schema is up to date:
-  ```bash
+  \`\`\`bash
   psql "YOUR_DATABASE_URL" -f scripts/001-create-database-schema.sql
-  ```
+  \`\`\`
 - [ ] Test database connection manually:
-  ```bash
+  \`\`\`bash
   psql "YOUR_DATABASE_URL" -c "SELECT 1;"
-  ```
+  \`\`\`
 
 ### 3. Docker Configuration (for Docker deployments)
 
@@ -35,52 +35,52 @@ Before deploying the fixes to production, ensure you have completed these steps:
 ### Option A: Docker Compose Deployment (VPS)
 
 1. **Stop existing containers**:
-   ```bash
+   \`\`\`bash
    docker-compose down
-   ```
+   \`\`\`
 
 2. **Pull latest code**:
-   ```bash
+   \`\`\`bash
    git pull origin main
-   ```
+   \`\`\`
 
 3. **Rebuild containers** (with no cache for clean build):
-   ```bash
+   \`\`\`bash
    docker-compose build --no-cache frontend
-   ```
+   \`\`\`
 
 4. **Start services**:
-   ```bash
+   \`\`\`bash
    docker-compose up -d
-   ```
+   \`\`\`
 
 5. **Verify deployment**:
-   ```bash
+   \`\`\`bash
    docker-compose logs -f frontend
    docker-compose ps
-   ```
+   \`\`\`
 
 ### Option B: Manual Deployment
 
 1. **Pull latest code**:
-   ```bash
+   \`\`\`bash
    git pull origin main
-   ```
+   \`\`\`
 
 2. **Install dependencies**:
-   ```bash
+   \`\`\`bash
    npm install
-   ```
+   \`\`\`
 
 3. **Build the application**:
-   ```bash
+   \`\`\`bash
    NEXT_PUBLIC_API_URL=https://www.promolinxy.online npm run build
-   ```
+   \`\`\`
 
 4. **Start the application**:
-   ```bash
+   \`\`\`bash
    npm run start
-   ```
+   \`\`\`
 
 ### Option C: Vercel Deployment
 
@@ -101,7 +101,7 @@ Before deploying the fixes to production, ensure you have completed these steps:
 
 Test each API endpoint that was previously failing:
 
-```bash
+\`\`\`bash
 # Replace with your actual domain and auth token
 BASE_URL="https://www.promolinxy.online"
 AUTH_TOKEN="your-jwt-token-here"
@@ -126,7 +126,7 @@ curl -H "Authorization: Bearer $AUTH_TOKEN" \
 # Test auth/me endpoint
 curl -H "Authorization: Bearer $AUTH_TOKEN" \
   "$BASE_URL/api/auth/me"
-```
+\`\`\`
 
 ### 2. Frontend Verification
 
@@ -139,13 +139,13 @@ curl -H "Authorization: Bearer $AUTH_TOKEN" \
 ### 3. Error Monitoring
 
 - [ ] Check application logs for any errors:
-  ```bash
+  \`\`\`bash
   # For Docker deployment
   docker-compose logs -f frontend
   
   # For PM2 deployment
   pm2 logs
-  ```
+  \`\`\`
 
 - [ ] Monitor server response times
 - [ ] Check for any 500 errors in access logs
@@ -157,21 +157,21 @@ If issues occur after deployment:
 ### Docker Deployment Rollback
 
 1. **Stop current deployment**:
-   ```bash
+   \`\`\`bash
    docker-compose down
-   ```
+   \`\`\`
 
 2. **Checkout previous version**:
-   ```bash
+   \`\`\`bash
    git log --oneline  # Find the commit hash before the changes
    git checkout <previous-commit-hash>
-   ```
+   \`\`\`
 
 3. **Rebuild and restart**:
-   ```bash
+   \`\`\`bash
    docker-compose build --no-cache
    docker-compose up -d
-   ```
+   \`\`\`
 
 ### Manual Deployment Rollback
 

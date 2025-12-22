@@ -1,0 +1,65 @@
+# =====================================================
+# DOCKERFILE - Frontend Next.js
+# =====================================================
+
+FROM node:20e AS base
+
+# Instala dependências apenas quando necessário
+FROM base AS deps
+WORKDIR /app
+
+# Suporta npm, yarn e pnpm
+COPY package*.json pnpm-lock.yaml* yarn.lock* ./
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm install --frozen-lockfile; \
+  elif [ -f yarn.lock ]; then \
+    yarn --frozen-lockfile; \
+  else \
+    npm ci; \
+  fi
+
+# Build da aplicação
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Environment variables needed at build time
+ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* vars must be set at build time to be embedded in the bundle
+# These can be overridden by passing --build-arg during docker build
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+RUN \
+  if [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm run build; \
+  elif [ -f yarn.lock ]; then \
+    yarn build; \
+  else \
+    npm run build; \
+  fi
+
+# Imagem de produção
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "server.js"]

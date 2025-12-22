@@ -2,12 +2,15 @@
 // WHATSAPP SERVER - Backend WhatsApp Engine Service
 // =====================================================
 
-import { WhatsAppEngine, whatsappManager } from "./lib/whatsapp-engine"
+import { type WhatsAppEngine, whatsappManager } from "./lib/whatsapp-engine"
 import { MessageQueue } from "./lib/message-queue"
-import { query, queryOne, update, dbPool, closePool } from "./lib/db"
+import { query, queryOne, update, closePool } from "./lib/db"
 import type { WhatsAppSession, Tenant } from "./lib/types"
-import express, { Application, Request, Response, NextFunction } from "express"
+import express, { type Application, type Request, type Response, type NextFunction } from "express"
 import cors from "cors"
+
+import { initializeTypebotBridge, type TypebotBridge } from "./integrations/typebotBridge"
+import { disconnectRedis } from "./integrations/redisSession"
 
 const app: Application = express()
 const PORT = process.env.WHATSAPP_PORT || 3001
@@ -20,6 +23,8 @@ app.use(express.json())
 // Store active queues
 const activeQueues: Map<string, MessageQueue> = new Map()
 
+let typebotBridge: TypebotBridge | null = null
+
 // =====================================================
 // API ROUTES
 // =====================================================
@@ -30,6 +35,7 @@ app.get("/health", (_req: Request, res: Response) => {
     status: "healthy",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    typebotBridgeActive: typebotBridge !== null,
   })
 })
 
@@ -38,10 +44,9 @@ app.get("/api/whatsapp/status/:tenantId", async (req: Request, res: Response) =>
   try {
     const { tenantId } = req.params
 
-    const session = await queryOne<WhatsAppSession>(
-      `SELECT * FROM whatsapp_sessions WHERE tenant_id = $1 LIMIT 1`,
-      [tenantId]
-    )
+    const session = await queryOne<WhatsAppSession>(`SELECT * FROM whatsapp_sessions WHERE tenant_id = $1 LIMIT 1`, [
+      tenantId,
+    ])
 
     if (!session) {
       return res.json({
@@ -73,20 +78,16 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
     const { tenantId } = req.params
 
     // Check if tenant exists
-    const tenant = await queryOne<Tenant>(
-      `SELECT * FROM tenants WHERE id = $1`,
-      [tenantId]
-    )
+    const tenant = await queryOne<Tenant>(`SELECT * FROM tenants WHERE id = $1`, [tenantId])
 
     if (!tenant) {
       return res.status(404).json({ success: false, error: "Tenant not found" })
     }
 
     // Get or create session
-    let session = await queryOne<WhatsAppSession>(
-      `SELECT * FROM whatsapp_sessions WHERE tenant_id = $1 LIMIT 1`,
-      [tenantId]
-    )
+    let session = await queryOne<WhatsAppSession>(`SELECT * FROM whatsapp_sessions WHERE tenant_id = $1 LIMIT 1`, [
+      tenantId,
+    ])
 
     if (!session) {
       // Create new session
@@ -94,7 +95,7 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
         `INSERT INTO whatsapp_sessions (tenant_id, session_name, status)
          VALUES ($1, 'principal', 'connecting')
          RETURNING *`,
-        [tenantId]
+        [tenantId],
       )
       session = result[0]
     } else {
@@ -125,10 +126,10 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
         })
         console.log(`[WhatsApp ${tenantId}] Connected: ${phoneNumber}`)
 
-  // Start message queue for this tenant
-  // Option A: Disable internal MessageQueue to avoid duplicate processing.
-  // The standalone queue-worker is responsible for scheduling.
-  console.log(`[Queue] Internal MessageQueue disabled. Standalone worker will process tenant ${tenantId}`)
+        // Start message queue for this tenant
+        // Option A: Disable internal MessageQueue to avoid duplicate processing.
+        // The standalone queue-worker is responsible for scheduling.
+        console.log(`[Queue] Internal MessageQueue disabled. Standalone worker will process tenant ${tenantId}`)
       },
       onDisconnected: async (reason: string) => {
         await update("whatsapp_sessions", session!.id, {
@@ -142,7 +143,27 @@ app.post("/api/whatsapp/connect/:tenantId", async (req: Request, res: Response) 
       },
       onMessage: async (message) => {
         console.log(`[WhatsApp ${tenantId}] Incoming message from ${message.from}: ${message.body}`)
-        // Handle incoming messages - could trigger flows, etc.
+
+        // Ignora mensagens de grupo
+        if (message.isGroup) {
+          console.log(`[WhatsApp ${tenantId}] Ignorando mensagem de grupo`)
+          return
+        }
+
+        // Processa mensagem via Typebot Bridge
+        if (typebotBridge) {
+          try {
+            const currentEngine = whatsappManager.getEngine(tenantId)
+            if (currentEngine) {
+              const result = await typebotBridge.processIncomingMessage(currentEngine, message.from, message.body)
+              console.log(`[WhatsApp ${tenantId}] Typebot processou: ${result.messagesSent} mensagens enviadas`)
+            }
+          } catch (error) {
+            console.error(`[WhatsApp ${tenantId}] Erro ao processar via Typebot:`, error)
+          }
+        } else {
+          console.warn(`[WhatsApp ${tenantId}] TypebotBridge não inicializado`)
+        }
       },
     })
 
@@ -169,10 +190,9 @@ app.post("/api/whatsapp/disconnect/:tenantId", async (req: Request, res: Respons
     await whatsappManager.removeEngine(tenantId, preserveSession)
     stopMessageQueue(tenantId)
 
-    const session = await queryOne<WhatsAppSession>(
-      `SELECT * FROM whatsapp_sessions WHERE tenant_id = $1 LIMIT 1`,
-      [tenantId]
-    )
+    const session = await queryOne<WhatsAppSession>(`SELECT * FROM whatsapp_sessions WHERE tenant_id = $1 LIMIT 1`, [
+      tenantId,
+    ])
 
     if (session) {
       await update("whatsapp_sessions", session.id, {
@@ -182,11 +202,11 @@ app.post("/api/whatsapp/disconnect/:tenantId", async (req: Request, res: Respons
       })
     }
 
-    return res.json({ 
-      success: true, 
-      message: preserveSession 
-        ? "Disconnected. Session data preserved for future reconnection." 
-        : "Disconnected and logged out completely."
+    return res.json({
+      success: true,
+      message: preserveSession
+        ? "Disconnected. Session data preserved for future reconnection."
+        : "Disconnected and logged out completely.",
     })
   } catch (error) {
     console.error("WhatsApp disconnect error:", error)
@@ -254,7 +274,7 @@ app.get("/api/whatsapp/sessions", (_req: Request, res: Response) => {
 app.get("/api/whatsapp/persisted-sessions", (_req: Request, res: Response) => {
   try {
     const persisted = whatsappManager.listPersistedSessions()
-    const sessionDetails = persisted.map(sessionId => ({
+    const sessionDetails = persisted.map((sessionId) => ({
       sessionId,
       metadata: whatsappManager.getSessionMetadata(sessionId),
     }))
@@ -269,17 +289,17 @@ app.get("/api/whatsapp/persisted-sessions", (_req: Request, res: Response) => {
 app.delete("/api/whatsapp/session-data/:tenantId", async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params
-    
+
     // First disconnect if active (false = don't preserve session, do full logout)
     const engine = whatsappManager.getEngine(tenantId)
     if (engine) {
       const preserveSessionOnDelete = false
       await whatsappManager.removeEngine(tenantId, preserveSessionOnDelete)
     }
-    
+
     // Delete persisted data
     const deleted = await whatsappManager.deleteSessionData(tenantId)
-    
+
     if (deleted) {
       return res.json({ success: true, message: "Session data deleted successfully" })
     } else {
@@ -298,14 +318,14 @@ app.get("/api/whatsapp/debug/:tenantId", (req: Request, res: Response) => {
     const engine = whatsappManager.getEngine(tenantId)
     const hasPersistedSession = whatsappManager.hasExistingSession(tenantId)
     const metadata = whatsappManager.getSessionMetadata(tenantId)
-    
-    return res.json({ 
-      success: true, 
+
+    return res.json({
+      success: true,
       data: {
         engineStatus: engine?.getStatus() || null,
         hasPersistedSession,
         metadata,
-      }
+      },
     })
   } catch (error) {
     console.error("Debug route error:", error)
@@ -322,22 +342,280 @@ app.post("/api/whatsapp/cleanup-legacy", async (req: Request, res: Response) => 
     const adminSecret = process.env.ADMIN_SECRET
     const providedSecret = req.headers["x-admin-secret"]
     const isLocalhost = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1"
-    
+
     if (adminSecret && providedSecret !== adminSecret && !isLocalhost) {
       console.warn("[Server] Unauthorized cleanup-legacy attempt")
       return res.status(403).json({ success: false, error: "Unauthorized" })
     }
-    
+
     const cleaned = await whatsappManager.cleanupLegacySessionData()
-    return res.json({ 
-      success: true, 
-      message: cleaned 
-        ? "Legacy session data cleaned up successfully" 
-        : "No legacy session data found to clean"
+    return res.json({
+      success: true,
+      message: cleaned ? "Legacy session data cleaned up successfully" : "No legacy session data found to clean",
     })
   } catch (error) {
     console.error("Legacy cleanup error:", error)
     return res.status(500).json({ success: false, error: "Error cleaning up legacy session data" })
+  }
+})
+
+// =====================================================
+// ZENDER WEBHOOK - Recebe cliques de botões do Zender
+// =====================================================
+
+app.post("/api/zender/webhook", async (req: Request, res: Response) => {
+  try {
+    const body = req.body;
+
+    console.log("[Zender Webhook] Recebido:", JSON.stringify(body, null, 2));
+
+    // ------------------------------------------------------------
+    // GARANTE QUE O TYPEBOTBRIDGE EXISTE
+    // ------------------------------------------------------------
+    if (!typebotBridge) {
+      console.warn("[Zender Webhook] TypebotBridge não inicializado");
+      return res.status(500).json({
+        success: false,
+        error: "TypebotBridge not initialized"
+      });
+    }
+
+    // ------------------------------------------------------------
+    // FORMATO NOVO DO ZENDER: event = "button_click"
+    // ------------------------------------------------------------
+    if (body?.event === "button_click" && body?.data?.selectedId) {
+      const selectedId = body.data.selectedId;
+
+      const phone = (body?.data?.from || "")
+        .replace("@c.us", "")
+        .replace(/\D/g, "");
+
+      if (!phone || !selectedId) {
+        console.warn("[Zender Webhook] Dados incompletos:", { phone, selectedId });
+        return res.status(400).json({ success: false, error: "Missing phone or selectedId" });
+      }
+
+      console.log(`[Zender Webhook] Botão clicado: ${selectedId} por ${phone}`);
+
+      // Escolhe engine ativo
+// Tenta identificar o tenant pelo session enviado pelo Zender
+const tenantId = body?.session;
+
+if (!tenantId) {
+  console.warn("[Zender Webhook] session não enviada pelo Zender");
+  return res.status(400).json({ success: false, error: "Missing session/tenantId" });
+}
+
+const engine = whatsappManager.getEngine(tenantId);
+
+if (!engine) {
+  console.warn("[Zender Webhook] Nenhum engine encontrado para tenant:", tenantId);
+  return res.status(400).json({
+    success: false,
+    error: `Engine not found for tenant ${tenantId}`
+  });
+}
+
+
+      try {
+        const result = await typebotBridge.processIncomingMessage(
+          engine,
+          phone,
+          selectedId
+        );
+
+        console.log(`[Zender Webhook] Typebot processou: ${result.messagesSent} mensagens enviadas`);
+
+        return res.json({
+          success: true,
+          processed: true,
+          messagesSent: result.messagesSent
+        });
+      } catch (error) {
+        console.error("[Zender Webhook] Erro ao processar via Typebot:", error);
+        return res.status(500).json({ success: false, error: "Error processing button click" });
+      }
+    }
+
+    // ------------------------------------------------------------
+    // NOVO: PROCESSAR EVENTO "message" PARA USAR JID CLÁSSICO
+    // Quando o Zender envia event=message, pode vir com from=@lid e
+    // _data.key.remoteJidAlt com JID clássico (@s.whatsapp.net). Vamos preferir 
+    // sempre os dígitos do JID clássico se disponíveis.
+    // ------------------------------------------------------------
+    if (body?.event === "message" && body?.payload) {
+      // Extrai possíveis fontes
+      const payload = body.payload;
+      const key = payload?._data?.key || {};
+      const remoteJid: string = key.remoteJid || payload.from || "";
+      const remoteJidAlt: string = key.remoteJidAlt || "";
+
+      // Função para obter dígitos clássicos
+      const toDigits = (jid: string): string => String(jid).replace(/@.*$/, "").replace(/\D/g, "");
+
+      // Preferência: usar remoteJidAlt se for clássico (@s.whatsapp.net ou @c.us)
+      let phoneDigits = "";
+      if (remoteJidAlt && (remoteJidAlt.endsWith("@s.whatsapp.net") || remoteJidAlt.endsWith("@c.us"))) {
+        phoneDigits = toDigits(remoteJidAlt);
+      } else if (remoteJid && (remoteJid.endsWith("@s.whatsapp.net") || remoteJid.endsWith("@c.us"))) {
+        phoneDigits = toDigits(remoteJid);
+      } else {
+        // Fallback: usar from como dígitos (mesmo que seja @lid, apenas dígitos)
+        phoneDigits = toDigits(payload.from || remoteJid || remoteJidAlt || "");
+      }
+
+      // Escolhe engine pelo session
+      const tenantId = body?.session;
+      if (!tenantId) {
+        console.warn("[Zender Webhook] message: session não enviada pelo Zender");
+        return res.status(400).json({ success: false, error: "Missing session/tenantId" });
+      }
+
+      let engine = whatsappManager.getEngine(tenantId);
+      if (!engine) {
+        console.warn("[Zender Webhook] message: Nenhum engine encontrado para tenant:", tenantId);
+        // Tentativa 1: localizar engine pelo número do próprio bot (body.me.id)
+        try {
+          const meId: string = body?.me?.id || "";
+          const meDigits = meId.replace(/@.*$/, "").replace(/\D/g, "");
+          const engines = whatsappManager.getAllEngines();
+          for (const [, eng] of engines) {
+            const status = eng.getStatus();
+            const botDigits = (status.phoneNumber || "").replace(/\D/g, "");
+            if (botDigits && meDigits && botDigits.endsWith(meDigits)) {
+              engine = eng;
+              console.log(`[Zender Webhook] message: engine resolvido via me.id (${meDigits})`);
+              break;
+            }
+          }
+        } catch {}
+
+        // Tentativa 2: pegar o primeiro engine conectado
+        if (!engine) {
+          const engines = whatsappManager.getAllEngines();
+          const connected = engines.find(([, eng]) => eng.isConnected());
+          if (connected) {
+            engine = connected[1];
+            console.log(`[Zender Webhook] message: usando engine conectado por fallback`);
+          }
+        }
+
+        if (!engine) {
+          return res.status(400).json({ success: false, error: `Engine not found for tenant ${tenantId}` });
+        }
+      }
+
+      // Conteúdo da mensagem
+      const text = payload?.body || payload?.message?.extendedTextMessage?.text || "";
+      if (!phoneDigits || !text) {
+        console.warn("[Zender Webhook] message: Dados incompletos:", { phoneDigits, text });
+        return res.status(200).json({ success: true, processed: false, reason: "Missing phone or text" });
+      }
+
+      // Store LID mapping if we have both LID and classic JID
+      // This prevents duplicate message processing
+      if (remoteJid.includes("@lid") && remoteJidAlt && phoneDigits) {
+        const lidDigits = toDigits(remoteJid);
+        if (lidDigits && lidDigits !== phoneDigits && lidDigits.length >= 10) {
+          // Store the mapping in the engine to prevent duplicate processing
+          if (engine && typeof (engine as any).storeLidMapping === 'function') {
+            (engine as any).storeLidMapping(lidDigits, phoneDigits);
+            console.log(`[Zender Webhook] Stored LID mapping: ${lidDigits} -> ${phoneDigits}`);
+          }
+        }
+      }
+
+      console.log(`[Zender Webhook] message: usando dígitos clássicos '${phoneDigits}' (session=${tenantId})`);
+
+      try {
+        const result = await typebotBridge.processIncomingMessage(engine, phoneDigits, text);
+        console.log(`[Zender Webhook] message: Typebot processou: ${result.messagesSent} mensagens enviadas`);
+        return res.json({ success: true, processed: true, messagesSent: result.messagesSent });
+      } catch (error) {
+        console.error("[Zender Webhook] message: Erro ao processar via Typebot:", error);
+        return res.status(500).json({ success: false, error: "Error processing message" });
+      }
+    }
+
+    // ------------------------------------------------------------
+    // Caso não seja um tipo tratado
+    // ------------------------------------------------------------
+    console.log(`[Zender Webhook] Tipo não processado: ${body.event || body.type}`);
+    return res.json({ success: true, processed: false, reason: "Type not handled" });
+
+  } catch (error) {
+    console.error("[Zender Webhook] Erro:", error);
+    return res.status(500).json({ success: false, error: "Internal server error" });
+  }
+});
+
+
+
+// =====================================================
+// TYPEBOT ROUTES - Rotas para gerenciamento do Typebot
+// =====================================================
+
+app.post("/api/typebot/reset-session", async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.body
+
+    if (!phone) {
+      return res.status(400).json({ success: false, error: "Phone number required" })
+    }
+
+    if (!typebotBridge) {
+      return res.status(500).json({ success: false, error: "TypebotBridge not initialized" })
+    }
+
+    const deleted = await typebotBridge.resetSession(phone)
+
+    return res.json({
+      success: true,
+      message: deleted ? "Session reset successfully" : "No session found for this phone",
+      phone,
+    })
+  } catch (error) {
+    console.error("Typebot reset session error:", error)
+    return res.status(500).json({ success: false, error: "Error resetting session" })
+  }
+})
+
+app.get("/api/typebot/session/:phone", async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.params
+
+    if (!typebotBridge) {
+      return res.status(500).json({ success: false, error: "TypebotBridge not initialized" })
+    }
+
+    const sessionInfo = await typebotBridge.getSessionInfo(phone)
+
+    return res.json({
+      success: true,
+      data: sessionInfo,
+    })
+  } catch (error) {
+    console.error("Typebot get session error:", error)
+    return res.status(500).json({ success: false, error: "Error getting session" })
+  }
+})
+
+app.get("/api/typebot/sessions", async (_req: Request, res: Response) => {
+  try {
+    if (!typebotBridge) {
+      return res.status(500).json({ success: false, error: "TypebotBridge not initialized" })
+    }
+
+    const sessions = await typebotBridge.listActiveSessions()
+
+    return res.json({
+      success: true,
+      data: sessions,
+      count: sessions.length,
+    })
+  } catch (error) {
+    console.error("Typebot list sessions error:", error)
+    return res.status(500).json({ success: false, error: "Error listing sessions" })
   }
 })
 
@@ -377,7 +655,7 @@ function stopMessageQueue(tenantId: string): void {
 
 /**
  * Initialize active connections on server startup
- * 
+ *
  * This function implements robust session restoration:
  * 1. First, clean up any legacy session data from old shared clientId
  * 2. Check for persisted session data (LocalAuth files)
@@ -390,29 +668,33 @@ async function initializeActiveConnections(): Promise<void> {
     // This prevents Chromium profile lock conflicts
     console.log("[Server] Cleaning up legacy session data...")
     await whatsappManager.cleanupLegacySessionData()
-    
+
     console.log("[Server] Checking for persisted sessions...")
-    
+
     // Get list of sessions that have persisted data
     const persistedSessions = whatsappManager.listPersistedSessions()
-    console.log(`[Server] Found ${persistedSessions.length} persisted sessions: ${persistedSessions.join(", ") || "none"}`)
+    console.log(
+      `[Server] Found ${persistedSessions.length} persisted sessions: ${persistedSessions.join(", ") || "none"}`,
+    )
 
     // Find all active WhatsApp sessions from database
     const dbSessions = await query<WhatsAppSession>(
       `SELECT ws.*, t.id as tenant_id 
        FROM whatsapp_sessions ws 
        JOIN tenants t ON ws.tenant_id = t.id 
-       WHERE t.status = 'active'`
+       WHERE t.status = 'active'`,
     )
 
     console.log(`[Server] Found ${dbSessions.length} sessions in database`)
 
     // Prioritize sessions that have both DB record and persisted data
-    const sessionsToRestore = dbSessions.filter(session => {
+    const sessionsToRestore = dbSessions.filter((session) => {
       const hasPersisted = whatsappManager.hasExistingSession(session.tenant_id)
       if (hasPersisted) {
         const metadata = whatsappManager.getSessionMetadata(session.tenant_id)
-        console.log(`[Server] Session ${session.tenant_id} has persisted data, last connected: ${metadata?.lastConnected || "unknown"}`)
+        console.log(
+          `[Server] Session ${session.tenant_id} has persisted data, last connected: ${metadata?.lastConnected || "unknown"}`,
+        )
       }
       return hasPersisted || session.status === "connected"
     })
@@ -456,6 +738,28 @@ async function initializeActiveConnections(): Promise<void> {
             console.log(`[Server] Session ${session.tenant_id} disconnected: ${reason}`)
             stopMessageQueue(session.tenant_id)
           },
+          onMessage: async (message) => {
+            console.log(`[WhatsApp ${session.tenant_id}] Incoming message from ${message.from}: ${message.body}`)
+
+            if (message.isGroup) {
+              console.log(`[WhatsApp ${session.tenant_id}] Ignorando mensagem de grupo`)
+              return
+            }
+
+            if (typebotBridge) {
+              try {
+                const currentEngine = whatsappManager.getEngine(session.tenant_id)
+                if (currentEngine) {
+                  const result = await typebotBridge.processIncomingMessage(currentEngine, message.from, message.body)
+                  console.log(
+                    `[WhatsApp ${session.tenant_id}] Typebot processou: ${result.messagesSent} mensagens enviadas`,
+                  )
+                }
+              } catch (error) {
+                console.error(`[WhatsApp ${session.tenant_id}] Erro ao processar via Typebot:`, error)
+              }
+            }
+          },
         })
 
         await engine.initialize()
@@ -481,9 +785,18 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 })
 
 // Start server
-const server = app.listen(Number(PORT), HOST, () => {
+const server = app.listen(Number(PORT), HOST, async () => {
   console.log(`[WhatsApp Server] Running on ${HOST}:${Number(PORT)}`)
   console.log(`[WhatsApp Server] Environment: ${process.env.NODE_ENV || "development"}`)
+
+  try {
+    console.log("[Server] Initializing TypebotBridge...")
+    typebotBridge = await initializeTypebotBridge()
+    console.log("[Server] TypebotBridge initialized successfully")
+  } catch (error) {
+    console.error("[Server] Failed to initialize TypebotBridge:", error)
+    console.warn("[Server] Continuing without Typebot integration")
+  }
 
   // Initialize active connections after server starts
   initializeActiveConnections()
@@ -505,6 +818,8 @@ process.on("SIGTERM", async () => {
     await whatsappManager.removeEngine(session.id)
   }
 
+  await disconnectRedis()
+
   // Close database pool
   await closePool()
 
@@ -516,6 +831,7 @@ process.on("SIGTERM", async () => {
 
 process.on("SIGINT", async () => {
   console.log("[WhatsApp Server] SIGINT received, shutting down...")
+  await disconnectRedis()
   await closePool()
   process.exit(0)
 })

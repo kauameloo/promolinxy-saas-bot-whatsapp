@@ -28,3 +28,18 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Webhook Integrations
+
+This project supports webhook integrations from multiple platforms:
+
+### Supported Platforms
+- **Cakto** - `/api/webhooks/cakto` - Original payment platform integration
+- **Kirvano** - `/api/webhooks/kirvano` - New payment platform integration (22 event types)
+
+Both integrations operate independently and support automated WhatsApp messaging flows based on payment events.
+
+For detailed documentation, see:
+- [Kirvano Webhook Documentation](./docs/KIRVANO_WEBHOOK.md)
+- [Webhook Troubleshooting](./docs/WEBHOOK_TROUBLESHOOTING.md)
+
